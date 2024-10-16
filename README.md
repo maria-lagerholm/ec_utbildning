@@ -1,2 +1,5 @@
-# Data Science Programme 2024, Sweden, Higher Vocational Education
-This repository contains answers for tests and exams at EC Data Science eduction 2024-2025
+# Hardworking Student
+
+This repository contains answers for tests and exams from the EC Data Science program, 2024-2025.
+
+![Hardworking Student](https://assets4.lottiefiles.com/packages/lf20_2LdL7X.json)
