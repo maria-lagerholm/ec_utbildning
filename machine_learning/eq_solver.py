@@ -5,6 +5,7 @@ from PIL import Image, ImageOps
 import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import random
+import os
 
 # Cache the model so it doesn't reload each time
 @st.cache_resource
@@ -14,7 +15,7 @@ def load_model():
     model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
     return tf.keras.models.load_model(model_path)
 
-model = load_model("joblib/cnn_model_aug.keras")
+model = load_model()
 class_names = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, box=20):
