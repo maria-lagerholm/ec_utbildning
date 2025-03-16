@@ -8,8 +8,11 @@ import random
 
 # Cache the model so it doesn't reload each time
 @st.cache_resource
-def load_model(path):
-    return tf.keras.models.load_model(path)
+def load_model():
+    # directory of eq_solver.py
+    this_dir = os.path.dirname(__file__)  
+    model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
+    return tf.keras.models.load_model(model_path)
 
 model = load_model("joblib/cnn_model_aug.keras")
 class_names = list("0123456789") + ["+", "-"]
