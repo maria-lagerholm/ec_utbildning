@@ -84,7 +84,7 @@ canvas = st_canvas(
     stroke_color="black",
     background_color="white",
     height=300,
-    width=900,
+    width=600,
     drawing_mode="freedraw",
     key="canvas"
 )
