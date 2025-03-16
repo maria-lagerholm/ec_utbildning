@@ -14,9 +14,11 @@ This project recognizes handwritten **digits** and **operators** (`+`, `-`) to s
 - The model **recognizes digits and operators**.  
 - The app **calculates the result** and displays it.  
 
-## Wake the app up if sleeping!  
+## Wake the app up if it's sleeping! It takes some time to load. :) 
 
-## Run the App  
+https://eq-solver.streamlit.app/
+
+## Run the App locally 
 
 ```bash
 pip install -r requirements.txt
@@ -27,3 +29,8 @@ streamlit run eq_solver.py
 
 - Augmented MNIST dataset for digits.  
 - Expanded with synthetic handwritten + and - signs.  
+
+## Acknowledgements  
+
+- Special thanks to OpenAI. This project would have taken much longer to complete without their generative models.  
+- Also, thanks to my teacher Antonio Prgomet, the authors of the referenced articles (mentioned in the respective notebooks) and tutorials that provided information and code examples.  
