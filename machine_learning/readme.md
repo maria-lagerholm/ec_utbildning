@@ -1,18 +1,17 @@
 # Handwritten Arithmetic Solver  
 
-This project recognizes handwritten **digits** and **operators** (`+`, `-`) to solve simple math equations.  
+This project recognizes handwritten **digits** and **operators** (`+`, `-`) and solves simple math equations.  
 
-## Model Training  
 
-1. Trained **Logistic Regression, SVM, and CNN** on the **MNIST dataset**.  
+1. I tried **Logistic Regression, SVM, and CNN** on the **MNIST dataset**.  
 2. **CNN performed best**, so I used it for the final model.  
-3. Augmented and expanded the dataset by adding **synthetic handwritten + and - signs**.  
+3. I augmented and expanded the dataset by adding **synthetic handwritten + and - signs** as well as some varriations to the digits positions - rotation, size, etc.  
 
-## How It Works  
+## How it works  
 
-- Users **draw an equation** (e.g., `12 + 34`).  
+- Users **draw an equation** (e.g., `12 + 34`) and click the **Solve** button.  
 - The model **recognizes digits and operators**.  
-- The app **calculates the result** and displays it.  
+- The app segments the numbers and the operators, then **calculates the result** and displays it.  
 
 ## Wake the app up if it's sleeping! It takes some time to load. :) 
 
@@ -32,5 +31,5 @@ streamlit run eq_solver.py
 
 ## Acknowledgements  
 
-- Special thanks to OpenAI. This project would have taken much longer to complete without their generative models.  
-- Also, thanks to my teacher Antonio Prgomet, the authors of the referenced articles (mentioned in the respective notebooks) and tutorials that provided information and code examples.  
+- Thanks to OpenAI. This project would have taken much longer to complete without their generative models.  
+- Thanks to my teacher Antonio Prgomet, as well as the authors of the referenced articles (mentioned in the respective notebooks) and tutorials that provided information and code examples.  
