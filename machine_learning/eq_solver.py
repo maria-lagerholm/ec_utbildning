@@ -11,7 +11,7 @@ import random
 def load_model(path):
     return tf.keras.models.load_model(path)
 
-model = load_model("/joblib/cnn_model_aug.keras")
+model = load_model("joblib/cnn_model_aug.keras")
 class_names = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, box=20):
