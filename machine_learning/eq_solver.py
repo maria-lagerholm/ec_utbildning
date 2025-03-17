@@ -7,34 +7,22 @@ from streamlit_drawable_canvas import st_canvas
 import os, random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+st.set_page_config(layout="wide")
 
-# Custom CSS for mobile responsiveness and to keep buttons side by side with a 5px gap
+# Custom CSS for mobile responsiveness for canvas
 st.markdown(
     """
     <style>
-    /* Hide the canvas toolbar */
-    div[data-testid="stCanvas"] .toolbar {
-        display: none;
-    }
-    /* Responsive canvas for mobile */
+    /* Responsive canvas: for mobile screens, canvas width will adjust to container width */
     @media (max-width: 768px) {
         div[data-testid="stCanvas"] > canvas {
             width: 100% !important;
             height: auto !important;
         }
     }
-    /* Force columns (the horizontal block) to remain in a row even on mobile with a 5px gap */
-    div[data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap !important;
-        gap: 5px !important;
-    }
     </style>
     """, unsafe_allow_html=True
 )
-
-# Maintain a canvas key in session_state for resetting the canvas
-if "canvas_key" not in st.session_state:
-    st.session_state.canvas_key = 0
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
@@ -83,8 +71,6 @@ def predict_expr(pil_img):
 st.title("Handwritten Math Solver 🖊️")
 st.write("Draw digits and + or - signs clearly below:")
 
-# Create the drawable canvas without its built-in toolbar.
-# Use a unique string key so that updating st.session_state.canvas_key forces reinitialization.
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
@@ -93,18 +79,10 @@ canvas = st_canvas(
     width=400,
     height=300,
     drawing_mode="freedraw",
-    key=f"canvas_{st.session_state.canvas_key}",
-    display_toolbar=False  # Hide the built-in toolbar
+    key="canvas"
 )
 
-# Place Solve and Clear buttons side by side using columns.
-col1, col2 = st.columns(2)
-with col1:
-    solve_clicked = st.button("Solve")
-with col2:
-    clear_clicked = st.button("Clear")
-
-if solve_clicked:
+if st.button("Solve"):
     if canvas.image_data is not None:
         data = canvas.image_data.astype("uint8")
         pil_img = Image.fromarray(data, "RGBA")
@@ -114,8 +92,3 @@ if solve_clicked:
         st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
     else:
         st.warning("Please draw something first!")
-
-if clear_clicked:
-    # Increment the canvas key to force reinitialization (clearing the canvas)
-    st.session_state.canvas_key += 1
-    st.experimental_rerun()
