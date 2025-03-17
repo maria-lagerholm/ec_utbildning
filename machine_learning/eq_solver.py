@@ -9,9 +9,18 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-this_dir = os.path.dirname(__file__)
+# Fix model loading issue by using absolute path
+this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
+
+# Check model file existence explicitly
+if not os.path.exists(model_path):
+    st.error(f"Model file not found at: {model_path}")
+    st.stop()
+
+# Load TensorFlow model
 model = tf.keras.models.load_model(model_path)
+
 labels = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, pad=20):
