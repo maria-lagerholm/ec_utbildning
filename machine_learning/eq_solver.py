@@ -8,7 +8,6 @@ import random
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-
 # Cache the model so it doesn't reload each time
 @st.cache_resource
 def load_model():
@@ -80,13 +79,17 @@ def predict_expression(img_pil):
 st.title("Handwritten \n Substraction/Addition Solver")
 st.markdown("<p style='font-size:20px;'>Draw digits and + or - signs below, then click <strong>Solve</strong>.</p>", unsafe_allow_html=True)
 
+# Adjust canvas size for mobile devices
+canvas_height = 300 if st.session_state.get('is_mobile', False) else 900
+canvas_width = 300 if st.session_state.get('is_mobile', False) else 900
+
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
     stroke_color="black",
     background_color="white",
-    height=300,
-    width=600,
+    height=canvas_height,
+    width=canvas_width,
     drawing_mode="freedraw",
     key="canvas"
 )
