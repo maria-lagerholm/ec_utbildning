@@ -30,7 +30,7 @@ st.markdown("""
     }
 }
 div.stButton > button:first-child {
-    background-color: #808080 !important;  /* Grey background */
+    background-color: #0D98BA !important;  /* Bluish green background */
     color: white !important;
     border: none !important;
     padding: 10px 24px !important;
