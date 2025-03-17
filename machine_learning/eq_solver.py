@@ -20,7 +20,7 @@ st.markdown("""
     width: 100% !important;
     height: auto !important;
 }
-@media (max-width: 1000px) {
+@media (max-width: 1024px) {
     [data-testid="stCanvas"] > canvas {
         width: 50% !important;
         height: auto !important;
