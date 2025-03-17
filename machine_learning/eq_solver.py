@@ -9,14 +9,9 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Inject CSS: force light theme, make canvas use 50% width on mobile, and reduce title size.
+# Inject CSS: make canvas use 50% width on mobile, and reduce title size.
 st.markdown("""
 <style>
-:root, body, .stApp {
-    background: #fff !important;
-    color: #000 !important;
-    color-scheme: light !important;
-}
 [data-testid="stCanvas"] {
     width: 100% !important;
     max-width: 100% !important;
@@ -25,7 +20,7 @@ st.markdown("""
     width: 100% !important;
     height: auto !important;
 }
-@media (max-width: 768px) {
+@media (max-width: 468px) {
     [data-testid="stCanvas"] > canvas {
         width: 50% !important;
         height: auto !important;
