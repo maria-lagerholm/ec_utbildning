@@ -53,20 +53,33 @@ def predict_expr(pil_img):
         ans = "Could not evaluate"
     return expr, ans
 
-st.title("Handwritten Math Solver 🖊️")
+st.title("Handwritten Math Solver")
 st.markdown('<style>h1{font-size:14px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
+# Calculate canvas width based on screen size
+canvas_width = """
+    <script>
+        var width = window.innerWidth;
+        if (width < 768) {
+            return 400;
+        } else {
+            return 900;
+        }
+    </script>
+"""
+
 canvas = st_canvas(
     fill_color="white",
-    stroke_width=16,
+    stroke_width=14,
     stroke_color="black",
     background_color="white",
-    width=400,
+    width=canvas_width,
     height=300,
     drawing_mode="freedraw",
     key="canvas"
 )
+
 
 if st.button("Solve"):
     if canvas.image_data is not None:
