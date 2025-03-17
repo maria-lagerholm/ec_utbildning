@@ -6,6 +6,19 @@ import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import random
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
+st.markdown("""
+    <style>
+    :root {
+        color-scheme: light !important;  /* Force light mode */
+    }
+    body, .stApp {
+        background-color: #FFFFFF !important;  /* White background */
+        color: #000000 !important;  /* Black text */
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Cache the model so it doesn't reload each time
 @st.cache_resource
