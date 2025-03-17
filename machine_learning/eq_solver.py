@@ -9,20 +9,24 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Custom CSS for mobile responsiveness (if needed)
+# Custom CSS for mobile responsiveness and to keep buttons side by side
 st.markdown(
     """
     <style>
-    /* Hide the canvas toolbar (if it exists) */
+    /* Hide the canvas toolbar */
     div[data-testid="stCanvas"] .toolbar {
         display: none;
     }
-    /* Optional: Responsive canvas for mobile */
+    /* Responsive canvas for mobile */
     @media (max-width: 768px) {
         div[data-testid="stCanvas"] > canvas {
             width: 100% !important;
             height: auto !important;
         }
+    }
+    /* Force columns (the horizontal block) to remain in a row even on mobile */
+    div[data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
     }
     </style>
     """, unsafe_allow_html=True
@@ -92,21 +96,25 @@ canvas = st_canvas(
     display_toolbar=False  # Hide the built-in toolbar
 )
 
-# Place Solve and Clear buttons side by side
+# Place Solve and Clear buttons side by side using columns.
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("Solve"):
-        if canvas.image_data is not None:
-            data = canvas.image_data.astype("uint8")
-            pil_img = Image.fromarray(data, "RGBA")
-            pil_img = pil_img.convert("L")
-            expr, sol = predict_expr(pil_img)
-            emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
-            st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
-        else:
-            st.warning("Please draw something first!")
+    solve_clicked = st.button("Solve")
 with col2:
-    if st.button("Clear"):
-        # Increment the canvas key to force a reinitialization (clearing the canvas)
-        st.session_state.canvas_key += 1
-        st.experimental_rerun()
+    clear_clicked = st.button("Clear")
+
+if solve_clicked:
+    if canvas.image_data is not None:
+        data = canvas.image_data.astype("uint8")
+        pil_img = Image.fromarray(data, "RGBA")
+        pil_img = pil_img.convert("L")
+        expr, sol = predict_expr(pil_img)
+        emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
+        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
+    else:
+        st.warning("Please draw something first!")
+
+if clear_clicked:
+    # Increment the canvas key to force reinitialization (clearing the canvas)
+    st.session_state.canvas_key += 1
+    st.experimental_rerun()
