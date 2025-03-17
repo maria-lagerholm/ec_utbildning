@@ -84,8 +84,7 @@ st.markdown(
     """, unsafe_allow_html=True
 )
 
-// ... existing code ...
-
+# Canvas for drawing input
 canvas = st_canvas(
     fill_color="white",
     stroke_width=14,
