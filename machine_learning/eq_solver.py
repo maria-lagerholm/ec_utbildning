@@ -9,53 +9,6 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Custom CSS: Responsive canvas; force canvas buttons and clickable elements to grey
-st.markdown("""
-<style>
-/* Canvas container should fill available width */
-[data-testid="stCanvas"] {
-    width: 100% !important;
-    max-width: 100% !important;
-}
-
-/* Canvas itself: default 100% width, but on smaller screens use 50% */
-[data-testid="stCanvas"] > canvas {
-    width: 100% !important;
-    height: auto !important;
-}
-@media (max-width: 1024px) {
-    [data-testid="stCanvas"] > canvas {
-        width: 50% !important;
-        height: auto !important;
-    }
-    h1 {
-        font-size: 2rem !important;
-    }
-}
-
-/* Style all buttons within the canvas to appear grey */
-[data-testid="stCanvas"] button,
-[data-testid="stCanvas"] [role="button"] {
-    background-color: #808080 !important;
-    color: white !important;
-    border: none !important;
-    padding: 6px 12px !important;
-    font-size: 14px !important;
-    border-radius: 8px !important;
-}
-
-/* Style the external Solve button as well */
-div.stButton > button:first-child {
-    background-color: #808080 !important;
-    color: white !important;
-    border: none !important;
-    padding: 10px 24px !important;
-    font-size: 16px !important;
-    border-radius: 12px !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 this_dir = os.path.dirname(__file__)
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
@@ -104,10 +57,6 @@ st.title("Handwritten Subtraction/Addition Solver")
 st.write("Draw digits and + or - signs below, then click Solve.")
 
 canvas = st_canvas(
-    fill_color="white",
-    stroke_width=16,
-    stroke_color="black",
-    background_color="white",
     height=300,
     drawing_mode="freedraw",
     key="canvas"
