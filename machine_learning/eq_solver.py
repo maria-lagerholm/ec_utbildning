@@ -7,23 +7,42 @@ from streamlit_drawable_canvas import st_canvas
 import random
 import os
 
+# Force CPU usage
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Inject custom CSS to force the canvas to be responsive and always use light theme
+# Set page layout to wide
+st.set_page_config(layout="wide")
+
+# Inject custom CSS for light theme, responsive canvas, and button styling
 st.markdown("""
     <style>
-    /* Force light theme colors */
+    /* Force light theme */
     :root, body, .stApp {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         color-scheme: light !important;
     }
-    /* Make the canvas responsive on mobile devices */
-    @media (max-width: 600px) {
-        [data-testid="stCanvas"] canvas {
-            width: 100% !important;
-            height: auto !important;
-        }
+    /* Make the canvas container and canvas responsive on mobile devices */
+    div[data-testid="stCanvas"] {
+        width: 100% !important;
+    }
+    div[data-testid="stCanvas"] canvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+    /* Style the Solve button */
+    div.stButton > button:first-child {
+        background-color: #4CAF50 !important; /* Green */
+        color: white !important;
+        border: none !important;
+        padding: 10px 24px !important;
+        text-align: center !important;
+        text-decoration: none !important;
+        display: inline-block !important;
+        font-size: 16px !important;
+        margin: 4px 2px !important;
+        cursor: pointer !important;
+        border-radius: 12px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -56,8 +75,8 @@ def segment_symbols(arr, margin=10):
         x, y, w, h = cv2.boundingRect(c)
         if w > 5 and h > 5:
             boxes.append((x, y, w, h))
-    boxes.sort(key=lambda b: b[0])
-    
+    boxes.sort(key=lambda b: b[0])  # sort left to right
+
     symbols = []
     for (x, y, w, h) in boxes:
         xm = max(0, x - margin)
@@ -92,7 +111,7 @@ def predict_expression(img_pil):
 st.title("Handwritten \n Subtraction/Addition Solver")
 st.markdown("<p style='font-size:20px;'>Draw digits and + or - signs below, then click <strong>Solve</strong>.</p>", unsafe_allow_html=True)
 
-# Set a default canvas size; the custom CSS will adjust the canvas on narrow screens.
+# Set default canvas size; the injected CSS will make it responsive
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
@@ -112,7 +131,7 @@ if st.button("Solve"):
             bg = Image.new("RGB", pil_img.size, (255, 255, 255))
             bg.paste(pil_img, mask=pil_img.split()[3])
             pil_img = bg
-        
+
         recognized, solution = predict_expression(pil_img)
         emojis = ["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"]
         chosen_emoji = random.choice(emojis)
