@@ -9,31 +9,44 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Inject custom CSS for responsive canvas and grey Solve button
+# Custom CSS: Responsive canvas; force canvas buttons and clickable elements to grey
 st.markdown("""
 <style>
+/* Canvas container should fill available width */
 [data-testid="stCanvas"] {
     width: 100% !important;
     max-width: 100% !important;
-    background-color: #D3D3D3 !important;  /* Light grey background for canvas */
 }
+
+/* Canvas itself: default 100% width, but on smaller screens use 50% */
 [data-testid="stCanvas"] > canvas {
     width: 100% !important;
     height: auto !important;
-    background-color: #D3D3D3 !important;  /* Light grey background for canvas */
 }
 @media (max-width: 1024px) {
     [data-testid="stCanvas"] > canvas {
         width: 50% !important;
         height: auto !important;
-        background-color: #D3D3D3 !important;  /* Light grey background for canvas */
     }
     h1 {
         font-size: 2rem !important;
     }
 }
+
+/* Style all buttons within the canvas to appear grey */
+[data-testid="stCanvas"] button,
+[data-testid="stCanvas"] [role="button"] {
+    background-color: #808080 !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+}
+
+/* Style the external Solve button as well */
 div.stButton > button:first-child {
-    background-color: #A9A9A9 !important;  /* Dark grey background for button */
+    background-color: #808080 !important;
     color: white !important;
     border: none !important;
     padding: 10px 24px !important;
@@ -94,7 +107,7 @@ canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
     stroke_color="black",
-    background_color="#D3D3D3",  # Light grey background for canvas
+    background_color="white",
     height=300,
     drawing_mode="freedraw",
     key="canvas"
