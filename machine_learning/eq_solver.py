@@ -9,7 +9,7 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Inject CSS: make canvas use 50% width on mobile, and reduce title size.
+# Inject custom CSS for responsive canvas and grey Solve button
 st.markdown("""
 <style>
 [data-testid="stCanvas"] {
@@ -30,7 +30,7 @@ st.markdown("""
     }
 }
 div.stButton > button:first-child {
-    background-color: #4CAF50 !important;
+    background-color: #808080 !important;  /* Grey background */
     color: white !important;
     border: none !important;
     padding: 10px 24px !important;
@@ -45,13 +45,13 @@ model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
 labels = list("0123456789") + ["+", "-"]
 
-def center_symbol(img, size=28, box=20):
+def center_symbol(img, size=28, pad=20):
     h, w = img.shape
-    scale = min(box / h, box / w)
+    scale = min(pad / h, pad / w)
     new_h, new_w = int(h * scale), int(w * scale)
     resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
     out = np.zeros((size, size), dtype=resized.dtype)
-    y, x = (size - new_h)//2, (size - new_w)//2
+    y, x = (size - new_h) // 2, (size - new_w) // 2
     out[y:y+new_h, x:x+new_w] = resized
     return out
 
@@ -73,7 +73,7 @@ def predict_expr(pil_img):
     chunks = segment_and_center(arr)
     preds = []
     for c in chunks:
-        c = c.astype(np.float32)/255.0
+        c = c.astype(np.float32) / 255.0
         c = c.reshape((1, 28, 28, 1))
         p = model.predict(c).argmax()
         preds.append(labels[p])
@@ -102,7 +102,7 @@ if st.button("Solve"):
         data = canvas.image_data.astype("uint8")
         pil_img = Image.fromarray(data, "RGBA")
         if pil_img.mode == "RGBA":
-            tmp = Image.new("RGB", pil_img.size, (255,255,255))
+            tmp = Image.new("RGB", pil_img.size, (255, 255, 255))
             tmp.paste(pil_img, mask=pil_img.split()[3])
             pil_img = tmp
         expr, sol = predict_expr(pil_img)
