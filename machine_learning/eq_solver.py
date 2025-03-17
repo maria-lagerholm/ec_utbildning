@@ -9,11 +9,11 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Custom CSS for mobile responsiveness and to keep buttons side by side
+# Custom CSS: hide canvas toolbar and force button columns to remain inline with minimal gap.
 st.markdown(
     """
     <style>
-    /* Hide the canvas toolbar */
+    /* Hide the canvas toolbar if it exists */
     div[data-testid="stCanvas"] .toolbar {
         display: none;
     }
@@ -24,15 +24,16 @@ st.markdown(
             height: auto !important;
         }
     }
-    /* Force columns (the horizontal block) to remain in a row even on mobile */
+    /* Force button columns to remain on one row with no wrapping and no gap */
     div[data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
+        gap: 0 !important;
     }
     </style>
     """, unsafe_allow_html=True
 )
 
-# Maintain a canvas key in session_state for resetting the canvas
+# Use session_state to store canvas key for resetting the canvas
 if "canvas_key" not in st.session_state:
     st.session_state.canvas_key = 0
 
@@ -83,7 +84,7 @@ def predict_expr(pil_img):
 st.title("Handwritten Math Solver 🖊️")
 st.write("Draw digits and + or - signs clearly below:")
 
-# Create the drawable canvas without its built-in toolbar
+# Create the drawable canvas without the built-in toolbar.
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
@@ -93,15 +94,13 @@ canvas = st_canvas(
     height=300,
     drawing_mode="freedraw",
     key=st.session_state.canvas_key,
-    display_toolbar=False  # Hide the built-in toolbar
+    display_toolbar=False
 )
 
-# Place Solve and Clear buttons side by side using columns.
-col1, col2 = st.columns(2)
-with col1:
-    solve_clicked = st.button("Solve")
-with col2:
-    clear_clicked = st.button("Clear")
+# Place Solve and Clear buttons side by side in fixed-ratio columns.
+cols = st.columns([1, 1])
+solve_clicked = cols[0].button("Solve")
+clear_clicked = cols[1].button("Clear")
 
 if solve_clicked:
     if canvas.image_data is not None:
@@ -115,6 +114,6 @@ if solve_clicked:
         st.warning("Please draw something first!")
 
 if clear_clicked:
-    # Increment the canvas key to force reinitialization (clearing the canvas)
+    # Increment canvas key to force a reinitialization, clearing the canvas.
     st.session_state.canvas_key += 1
     st.experimental_rerun()
