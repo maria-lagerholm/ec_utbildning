@@ -8,17 +8,6 @@ import random
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-st.markdown("""
-    <style>
-    :root {
-        color-scheme: light !important;  /* Force light mode */
-    }
-    body, .stApp {
-        background-color: #FFFFFF !important;  /* White background */
-        color: #000000 !important;  /* Black text */
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
 # Cache the model so it doesn't reload each time
 @st.cache_resource
@@ -101,6 +90,26 @@ canvas = st_canvas(
     drawing_mode="freedraw",
     key="canvas"
 )
+
+# Set button style to be visible on both white and black backgrounds
+button_style = """
+    <style>
+    div.stButton > button:first-child {
+        background-color: #4CAF50; /* Green */
+        color: white;
+        border: none;
+        padding: 10px 24px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 12px;
+    }
+    </style>
+"""
+st.markdown(button_style, unsafe_allow_html=True)
 
 if st.button("Solve"):
     if canvas.image_data is not None:
