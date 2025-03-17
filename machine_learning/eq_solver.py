@@ -7,6 +7,7 @@ from streamlit_drawable_canvas import st_canvas
 import os, random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
@@ -52,7 +53,7 @@ def predict_expr(pil_img):
         ans = "Could not evaluate"
     return expr, ans
 
-st.title("Handwritten Math Solver")
+st.title("Handwritten Math Solver 🖊️")
 st.markdown('<style>h1{font-size:14px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
@@ -73,6 +74,7 @@ if st.button("Solve"):
         pil_img = Image.fromarray(data, "RGBA")
         pil_img = pil_img.convert("L")
         expr, sol = predict_expr(pil_img)
-        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol}")
+        emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
+        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
     else:
         st.warning("Please draw something first!")
