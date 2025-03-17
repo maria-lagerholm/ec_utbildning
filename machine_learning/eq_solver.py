@@ -38,12 +38,9 @@ div.stButton > button:first-child {
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
-def load_model():
-    model_path = "joblib/cnn_model_aug.keras"  # Adjust if needed
-    return tf.keras.models.load_model(model_path)
-
-model = load_model()
+this_dir = os.path.dirname(__file__)
+model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
+model = tf.keras.models.load_model(model_path)
 labels = list("0123456789") + ["+", "-"]
 
 def segment_and_center(img):
