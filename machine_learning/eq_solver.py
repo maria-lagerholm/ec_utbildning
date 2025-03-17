@@ -4,121 +4,98 @@ import cv2
 from PIL import Image, ImageOps
 import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
-import random
-import os
+import os, random
 
-# Force CPU usage
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-# Set page layout to wide
 st.set_page_config(layout="wide")
 
-# Inject custom CSS for light theme, responsive canvas, and button styling
+# Minimal CSS for a white theme and a 100%-width responsive canvas
 st.markdown("""
-    <style>
-    /* Force light theme */
-    :root, body, .stApp {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        color-scheme: light !important;
-    }
-    /* Make the canvas container and canvas responsive on mobile devices */
-    div[data-testid="stCanvas"] {
-        width: auto !important;
-    }
-    div[data-testid="stCanvas"] canvas {
-        width: auto !important;
-        height: auto !important;
-    }
-    /* Style the Solve button */
-    div.stButton > button:first-child {
-        background-color: #4CAF50 !important; /* Green */
-        color: white !important;
-        border: none !important;
-        padding: 10px 24px !important;
-        text-align: center !important;
-        text-decoration: none !important;
-        display: inline-block !important;
-        font-size: 16px !important;
-        margin: 4px 2px !important;
-        cursor: pointer !important;
-        border-radius: 12px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+:root, body, .stApp {
+    background: #fff !important;
+    color: #000 !important;
+    color-scheme: light !important;
+}
+/* Make the st_canvas element auto-size to 100% width */
+[data-testid="stCanvas"] {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+[data-testid="stCanvas"] > canvas {
+    width: 100% !important;
+    height: auto !important;
+}
+/* Style our 'Solve' button green */
+div.stButton > button:first-child {
+    background-color: #4CAF50 !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 24px !important;
+    font-size: 16px !important;
+    border-radius: 12px !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Cache the model so it doesn't reload each time
 @st.cache_resource
 def load_model():
-    this_dir = os.path.dirname(__file__)  
-    model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
+    model_path = "joblib/cnn_model_aug.keras"  # Adjust if needed
     return tf.keras.models.load_model(model_path)
 
 model = load_model()
-class_names = list("0123456789") + ["+", "-"]
+labels = list("0123456789") + ["+", "-"]
 
-def center_symbol(img, size=28, box=20):
-    h, w = img.shape
-    scale = min(box / h, box / w)
-    new_h, new_w = int(h * scale), int(w * scale)
-    resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    out = np.zeros((size, size), dtype=resized.dtype)
-    y, x = (size - new_h)//2, (size - new_w)//2
-    out[y:y+new_h, x:x+new_w] = resized
+def segment_and_center(img):
+    _, bin_img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(bin_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    boxes = [cv2.boundingRect(c) for c in contours if cv2.contourArea(c) > 25]
+    boxes.sort(key=lambda b: b[0])
+    out = []
+    for x, y, w, h in boxes:
+        roi = img[max(0,y-10):y+h+10, max(0,x-10):x+w+10]
+        roi = center_symbol(roi)
+        out.append(roi)
     return out
 
-def segment_symbols(arr, margin=10):
-    _, bin_ = cv2.threshold(arr, 128, 255, cv2.THRESH_BINARY)
-    contours, _ = cv2.findContours(bin_, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    boxes = []
-    for c in contours:
-        x, y, w, h = cv2.boundingRect(c)
-        if w > 5 and h > 5:
-            boxes.append((x, y, w, h))
-    boxes.sort(key=lambda b: b[0])  # sort left to right
+def center_symbol(symbol, size=28, pad=20):
+    h, w = symbol.shape
+    scale = min(pad / h, pad / w)
+    nh, nw = int(h*scale), int(w*scale)
+    resized = cv2.resize(symbol, (nw, nh), interpolation=cv2.INTER_AREA)
+    out = np.zeros((size, size), dtype=resized.dtype)
+    sy, sx = (size - nh)//2, (size - nw)//2
+    out[sy:sy+nh, sx:sx+nw] = resized
+    return out
 
-    symbols = []
-    for (x, y, w, h) in boxes:
-        xm = max(0, x - margin)
-        ym = max(0, y - margin)
-        wm = min(arr.shape[1], x + w + margin) - xm
-        hm = min(arr.shape[0], y + h + margin) - ym
-        cropped = arr[ym:ym+hm, xm:xm+wm]
-        symbols.append(center_symbol(cropped))
-    return symbols
-
-def predict_expression(img_pil):
-    gray = img_pil.convert("L")
+def predict_expr(pil_img):
+    gray = pil_img.convert("L")
     inv = ImageOps.invert(gray)
     arr = np.array(inv)
-    symbol_imgs = segment_symbols(arr)
-    
-    result = []
-    for s in symbol_imgs:
-        s = (s.astype(np.float32) / 255.0).reshape((1, 28, 28, 1))
-        out = model.predict(s)
-        label = class_names[out.argmax()]
-        result.append(label)
-    
-    expression = "".join(result)
+    chunks = segment_and_center(arr)
+    preds = []
+    for c in chunks:
+        c = c.astype(np.float32)/255.0
+        c = c.reshape((1,28,28,1))
+        p = model.predict(c).argmax()
+        preds.append(labels[p])
+    expr = "".join(preds)
     try:
-        answer = eval(expression)
+        ans = eval(expr)
     except:
-        answer = "Could not evaluate"
-    return expression, answer
+        ans = "Could not evaluate"
+    return expr, ans
 
-# ------------------ Streamlit UI ------------------
-st.title("Handwritten \n Subtraction/Addition Solver")
-st.markdown("<p style='font-size:20px;'>Draw digits and + or - signs below, then click <strong>Solve</strong>.</p>", unsafe_allow_html=True)
+st.title("Handwritten Subtraction/Addition Solver")
+st.write("Draw digits and + or - signs below, then click Solve.")
 
-# Set default canvas size; the injected CSS will make it responsive
+# We only set a height; width is 100% from our CSS
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
     stroke_color="black",
     background_color="white",
     height=300,
-    width=600,
     drawing_mode="freedraw",
     key="canvas"
 )
@@ -126,16 +103,14 @@ canvas = st_canvas(
 if st.button("Solve"):
     if canvas.image_data is not None:
         data = canvas.image_data.astype("uint8")
-        pil_img = Image.fromarray(data, "RGBA")
-        if pil_img.mode == "RGBA":
-            bg = Image.new("RGB", pil_img.size, (255, 255, 255))
-            bg.paste(pil_img, mask=pil_img.split()[3])
-            pil_img = bg
-
-        recognized, solution = predict_expression(pil_img)
-        emojis = ["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"]
-        chosen_emoji = random.choice(emojis)
-        st.markdown(f"<p style='font-size:26px;'>Recognized: {recognized}</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='font-size:26px;'>Solution: {solution} {chosen_emoji}</p>", unsafe_allow_html=True)
+        pil = Image.fromarray(data, "RGBA")
+        if pil.mode == "RGBA":
+            tmp = Image.new("RGB", pil.size, (255,255,255))
+            tmp.paste(pil, mask=pil.split()[3])
+            pil = tmp
+        expr, sol = predict_expr(pil)
+        emo = random.choice(["😎","😊","🤔","🫡","👍","😉","🙂"])
+        st.write(f"**Recognized:** {expr}")
+        st.write(f"**Solution:** {sol} {emo}")
     else:
-        st.warning("No drawing found. Please draw something!")
+        st.warning("Please draw something first.")
