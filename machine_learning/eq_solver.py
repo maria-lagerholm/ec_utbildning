@@ -15,22 +15,25 @@ st.markdown("""
 [data-testid="stCanvas"] {
     width: 100% !important;
     max-width: 100% !important;
+    background-color: #D3D3D3 !important;  /* Light grey background for canvas */
 }
 [data-testid="stCanvas"] > canvas {
     width: 100% !important;
     height: auto !important;
+    background-color: #D3D3D3 !important;  /* Light grey background for canvas */
 }
 @media (max-width: 1024px) {
     [data-testid="stCanvas"] > canvas {
         width: 50% !important;
         height: auto !important;
+        background-color: #D3D3D3 !important;  /* Light grey background for canvas */
     }
     h1 {
         font-size: 2rem !important;
     }
 }
 div.stButton > button:first-child {
-    background-color: #0D98BA !important;  /* Bluish green background */
+    background-color: #A9A9A9 !important;  /* Dark grey background for button */
     color: white !important;
     border: none !important;
     padding: 10px 24px !important;
@@ -91,7 +94,7 @@ canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
     stroke_color="black",
-    background_color="white",
+    background_color="#D3D3D3",  # Light grey background for canvas
     height=300,
     drawing_mode="freedraw",
     key="canvas"
