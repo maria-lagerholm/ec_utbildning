@@ -8,7 +8,7 @@ import os, random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Custom CSS for mobile responsiveness and to keep buttons side by side
+# Custom CSS for mobile responsiveness and to keep buttons side by side with a 5px gap
 st.markdown(
     """
     <style>
@@ -23,9 +23,10 @@ st.markdown(
             height: auto !important;
         }
     }
-    /* Force columns (the horizontal block) to remain in a row even on mobile */
+    /* Force columns (the horizontal block) to remain in a row even on mobile with a 5px gap */
     div[data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
+        gap: 5px !important;
     }
     </style>
     """, unsafe_allow_html=True
@@ -82,7 +83,8 @@ def predict_expr(pil_img):
 st.title("Handwritten Math Solver 🖊️")
 st.write("Draw digits and + or - signs clearly below:")
 
-# Create the drawable canvas without its built-in toolbar
+# Create the drawable canvas without its built-in toolbar.
+# Use a unique string key so that updating st.session_state.canvas_key forces reinitialization.
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
@@ -91,7 +93,7 @@ canvas = st_canvas(
     width=400,
     height=300,
     drawing_mode="freedraw",
-    key=st.session_state.canvas_key,
+    key=f"canvas_{st.session_state.canvas_key}",
     display_toolbar=False  # Hide the built-in toolbar
 )
 
