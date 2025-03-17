@@ -9,18 +9,9 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Fix model loading issue by using absolute path
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
-
-# Check model file existence explicitly
-if not os.path.exists(model_path):
-    st.error(f"Model file not found at: {model_path}")
-    st.stop()
-
-# Load TensorFlow model
 model = tf.keras.models.load_model(model_path)
-
 labels = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, pad=20):
@@ -46,9 +37,9 @@ def segment_and_center(img):
 
 def predict_expr(pil_img):
     gray = pil_img.convert("L")
-    inv = ImageOps.invert(gray)
-    arr = np.array(inv)
-    chunks = segment_and_center(arr)
+    gray = np.array(gray)
+    gray = cv2.bitwise_not(gray)
+    chunks = segment_and_center(gray)
     preds = []
     for c in chunks:
         c = c.astype(np.float32) / 255.0
@@ -62,10 +53,31 @@ def predict_expr(pil_img):
         ans = "Could not evaluate"
     return expr, ans
 
-st.title("Handwritten Subtraction/Addition Solver")
-st.write("Draw digits and + or - signs below, then click Solve.")
+st.title("Handwritten Math Solver 🖊️")
+st.markdown('''
+<style>
+h1 {font-size:14px;}
+
+[data-testid="stCanvasToolbar"] {
+    background-color: grey !important;
+    border-radius: 5px;
+}
+@media (max-width: 600px) {
+    [data-testid="stCanvas"] canvas {
+        width: 100% !important;
+        height: auto !important;
+    }
+}
+</style>
+''', unsafe_allow_html=True)
+st.write("Draw digits and + or - signs clearly below:")
 
 canvas = st_canvas(
+    fill_color="white",
+    stroke_width=16,
+    stroke_color="black",
+    background_color="white",
+    width=400,
     height=300,
     drawing_mode="freedraw",
     key="canvas"
@@ -75,13 +87,9 @@ if st.button("Solve"):
     if canvas.image_data is not None:
         data = canvas.image_data.astype("uint8")
         pil_img = Image.fromarray(data, "RGBA")
-        if pil_img.mode == "RGBA":
-            tmp = Image.new("RGB", pil_img.size, (255, 255, 255))
-            tmp.paste(pil_img, mask=pil_img.split()[3])
-            pil_img = tmp
+        pil_img = pil_img.convert("L")
         expr, sol = predict_expr(pil_img)
         emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
-        st.write(f"**Recognized:** {expr}")
-        st.write(f"**Solution:** {sol} {emo}")
+        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
     else:
-        st.warning("Please draw something first.")
+        st.warning("Please draw something first!")
