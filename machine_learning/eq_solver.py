@@ -71,20 +71,6 @@ def predict_expr(pil_img):
 st.title("Handwritten Math Solver 🖊️")
 st.write("Draw digits and + or - signs clearly below:")
 
-# Custom CSS to style the toolbar buttons of the canvas
-st.markdown(
-    """
-    <style>
-    /* Style the toolbar buttons of the canvas */
-    div[data-testid="stCanvas"] .toolbar button {
-        background-color: green !important;
-        color: white !important;
-    }
-    </style>
-    """, unsafe_allow_html=True
-)
-
-# Canvas for drawing input
 canvas = st_canvas(
     fill_color="white",
     stroke_width=14,
