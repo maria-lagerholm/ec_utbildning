@@ -6,7 +6,6 @@ import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import os, random
 
-# Your existing imports and model loading code remains unchanged
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,7 +13,6 @@ model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
 labels = list("0123456789") + ["+", "-"]
 
-# Your existing functions remain unchanged
 def center_symbol(img, size=28, pad=20):
     h, w = img.shape
     scale = min(pad / h, pad / w)
@@ -54,50 +52,20 @@ def predict_expr(pil_img):
         ans = "Could not evaluate"
     return expr, ans
 
-# Add custom CSS for responsive canvas
-st.markdown("""
-    <style>
-        @media (max-width: 600px) {
-            .canvas-container {
-                width: 400px !important;
-                margin: 0 auto;
-            }
-        }
-        @media (min-width: 601px) {
-            .canvas-container {
-                width: 900px !important;
-                margin: 0 auto;
-            }
-        }
-        /* Ensure canvas scales properly */
-        .canvas-container canvas {
-            width: 100% !important;
-            height: auto !important;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-st.title("Handwritten Math Solver 🖊️")
+st.title("Handwritten Math Solver")
 st.markdown('<style>h1{font-size:14px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
-# Wrap canvas in a div with our responsive class
-with st.container():
-    st.markdown('<div class="canvas-container">', unsafe_allow_html=True)
-    
-    # Calculate height based on width to maintain aspect ratio
-    # Original was 400x300, so we'll maintain 3:4 ratio
-    canvas = st_canvas(
-        fill_color="white",
-        stroke_width=16,
-        stroke_color="black",
-        background_color="white",
-        width=900,  # This will be overridden by CSS
-        height=675, # 900 * (3/4) for desktop
-        drawing_mode="freedraw",
-        key="canvas"
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+canvas = st_canvas(
+    fill_color="white",
+    stroke_width=16,
+    stroke_color="black",
+    background_color="white",
+    width=400,
+    height=300,
+    drawing_mode="freedraw",
+    key="canvas"
+)
 
 if st.button("Solve"):
     if canvas.image_data is not None:
@@ -105,7 +73,6 @@ if st.button("Solve"):
         pil_img = Image.fromarray(data, "RGBA")
         pil_img = pil_img.convert("L")
         expr, sol = predict_expr(pil_img)
-        emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
-        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol} {emo}")
+        st.success(f"**Expression:** {expr}\n\n**Solution:** {sol}")
     else:
         st.warning("Please draw something first!")
