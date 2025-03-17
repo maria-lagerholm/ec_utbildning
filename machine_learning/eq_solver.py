@@ -57,31 +57,16 @@ st.title("Handwritten Math Solver")
 st.markdown('<style>h1{font-size:14px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
-# Set the canvas width to a large value (900) for desktop.
-# The CSS below will ensure the canvas scales down responsively on smaller screens.
+
 canvas = st_canvas(
     fill_color="white",
     stroke_width=14,
     stroke_color="black",
     background_color="white",
-    width=900,
+    width=600,
     height=300,
     drawing_mode="freedraw",
     key="canvas"
-)
-
-# Custom CSS to override the canvas element for responsiveness:
-st.markdown(
-    """
-    <style>
-    /* Force the canvas to scale responsively */
-    div[data-testid="stCanvas"] canvas {
-        width: 100% !important;
-        max-width: 900px;
-        height: auto !important;
-    }
-    </style>
-    """, unsafe_allow_html=True
 )
 
 if st.button("Solve"):
