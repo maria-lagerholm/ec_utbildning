@@ -9,7 +9,7 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# Minimal CSS for a white theme and a 100%-width responsive canvas
+# CSS for responsive design with smaller text and canvas on mobile
 st.markdown("""
 <style>
 :root, body, .stApp {
@@ -17,10 +17,23 @@ st.markdown("""
     color: #000 !important;
     color-scheme: light !important;
 }
+/* Responsive text size */
+@media (max-width: 768px) {
+    body, .stApp {
+        font-size: 14px !important;
+    }
+}
 /* Make the st_canvas element auto-size to 100% width */
 [data-testid="stCanvas"] {
     width: 100% !important;
     max-width: 100% !important;
+}
+/* Responsive canvas size */
+@media (max-width: 768px) {
+    [data-testid="stCanvas"] > canvas {
+        width: 50% !important;
+        height: auto !important;
+    }
 }
 [data-testid="stCanvas"] > canvas {
     width: 100% !important;
