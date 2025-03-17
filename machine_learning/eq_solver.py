@@ -9,6 +9,21 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
+# Custom CSS for mobile responsiveness for canvas
+st.markdown(
+    """
+    <style>
+    /* Responsive canvas: for mobile screens, canvas width will adjust to container width */
+    @media (max-width: 768px) {
+        div[data-testid="stCanvas"] > canvas {
+            width: 100% !important;
+            height: auto !important;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True
+)
+
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
@@ -49,27 +64,11 @@ def predict_expr(pil_img):
     expr = "".join(preds)
     try:
         ans = eval(expr)
-    except:
+    except Exception:
         ans = "Could not evaluate"
     return expr, ans
 
 st.title("Handwritten Math Solver 🖊️")
-st.markdown('''
-<style>
-h1 {font-size:14px;}
-
-[data-testid="stCanvasToolbar"] {
-    background-color: grey !important;
-    border-radius: 5px;
-}
-@media (max-width: 600px) {
-    [data-testid="stCanvas"] canvas {
-        width: 100% !important;
-        height: auto !important;
-    }
-}
-</style>
-''', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
 canvas = st_canvas(
