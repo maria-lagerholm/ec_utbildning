@@ -7,7 +7,6 @@ from streamlit_drawable_canvas import st_canvas
 import os, random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-st.set_page_config(layout="wide")
 
 # Custom CSS for mobile responsiveness and to keep buttons side by side
 st.markdown(
@@ -96,7 +95,7 @@ canvas = st_canvas(
     display_toolbar=False  # Hide the built-in toolbar
 )
 
-# Place Solve and Clear buttons side by side using columns
+# Place Solve and Clear buttons side by side using columns.
 col1, col2 = st.columns(2)
 with col1:
     solve_clicked = st.button("Solve")
