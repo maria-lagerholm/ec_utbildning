@@ -73,10 +73,10 @@ st.write("Draw digits and + or - signs clearly below:")
 
 canvas = st_canvas(
     fill_color="white",
-    stroke_width=14,
+    stroke_width=16,
     stroke_color="black",
     background_color="white",
-    width=900,
+    width=400,
     height=300,
     drawing_mode="freedraw",
     key="canvas"
