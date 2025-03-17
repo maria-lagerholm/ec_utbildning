@@ -24,10 +24,10 @@ st.markdown("""
     }
     /* Make the canvas container and canvas responsive on mobile devices */
     div[data-testid="stCanvas"] {
-        width: 100% !important;
+        width: auto !important;
     }
     div[data-testid="stCanvas"] canvas {
-        width: 100% !important;
+        width: auto !important;
         height: auto !important;
     }
     /* Style the Solve button */
