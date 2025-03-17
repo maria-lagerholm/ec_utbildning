@@ -7,6 +7,17 @@ from streamlit_drawable_canvas import st_canvas
 import random
 import os
 
+# Force color-scheme to 'light' with high priority
+st.markdown("""
+<style>
+:root, body, .main, .stApp {
+    color-scheme: light !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Cache the model so it doesn't reload each time
 @st.cache_resource
 def load_model():
