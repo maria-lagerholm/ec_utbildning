@@ -9,7 +9,7 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-# CSS for responsive design with smaller text and canvas on mobile
+# Inject CSS: force light theme, make canvas use 50% width on mobile, and reduce title size.
 st.markdown("""
 <style>
 :root, body, .stApp {
@@ -17,29 +17,23 @@ st.markdown("""
     color: #000 !important;
     color-scheme: light !important;
 }
-/* Responsive text size */
-@media (max-width: 768px) {
-    body, .stApp {
-        font-size: 14px !important;
-    }
-}
-/* Make the st_canvas element auto-size to 100% width */
 [data-testid="stCanvas"] {
     width: 100% !important;
     max-width: 100% !important;
-}
-/* Responsive canvas size */
-@media (max-width: 768px) {
-    [data-testid="stCanvas"] > canvas {
-        width: 50% !important;
-        height: auto !important;
-    }
 }
 [data-testid="stCanvas"] > canvas {
     width: 100% !important;
     height: auto !important;
 }
-/* Style our 'Solve' button green */
+@media (max-width: 768px) {
+    [data-testid="stCanvas"] > canvas {
+        width: 50% !important;
+        height: auto !important;
+    }
+    h1 {
+        font-size: 2rem !important;
+    }
+}
 div.stButton > button:first-child {
     background-color: #4CAF50 !important;
     color: white !important;
@@ -56,6 +50,16 @@ model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
 labels = list("0123456789") + ["+", "-"]
 
+def center_symbol(img, size=28, box=20):
+    h, w = img.shape
+    scale = min(box / h, box / w)
+    new_h, new_w = int(h * scale), int(w * scale)
+    resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    out = np.zeros((size, size), dtype=resized.dtype)
+    y, x = (size - new_h)//2, (size - new_w)//2
+    out[y:y+new_h, x:x+new_w] = resized
+    return out
+
 def segment_and_center(img):
     _, bin_img = cv2.threshold(img, 128, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(bin_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -63,19 +67,8 @@ def segment_and_center(img):
     boxes.sort(key=lambda b: b[0])
     out = []
     for x, y, w, h in boxes:
-        roi = img[max(0,y-10):y+h+10, max(0,x-10):x+w+10]
-        roi = center_symbol(roi)
-        out.append(roi)
-    return out
-
-def center_symbol(symbol, size=28, pad=20):
-    h, w = symbol.shape
-    scale = min(pad / h, pad / w)
-    nh, nw = int(h*scale), int(w*scale)
-    resized = cv2.resize(symbol, (nw, nh), interpolation=cv2.INTER_AREA)
-    out = np.zeros((size, size), dtype=resized.dtype)
-    sy, sx = (size - nh)//2, (size - nw)//2
-    out[sy:sy+nh, sx:sx+nw] = resized
+        roi = img[max(0, y-10):y+h+10, max(0, x-10):x+w+10]
+        out.append(center_symbol(roi))
     return out
 
 def predict_expr(pil_img):
@@ -86,7 +79,7 @@ def predict_expr(pil_img):
     preds = []
     for c in chunks:
         c = c.astype(np.float32)/255.0
-        c = c.reshape((1,28,28,1))
+        c = c.reshape((1, 28, 28, 1))
         p = model.predict(c).argmax()
         preds.append(labels[p])
     expr = "".join(preds)
@@ -99,7 +92,6 @@ def predict_expr(pil_img):
 st.title("Handwritten Subtraction/Addition Solver")
 st.write("Draw digits and + or - signs below, then click Solve.")
 
-# We only set a height; width is 100% from our CSS
 canvas = st_canvas(
     fill_color="white",
     stroke_width=16,
@@ -113,13 +105,13 @@ canvas = st_canvas(
 if st.button("Solve"):
     if canvas.image_data is not None:
         data = canvas.image_data.astype("uint8")
-        pil = Image.fromarray(data, "RGBA")
-        if pil.mode == "RGBA":
-            tmp = Image.new("RGB", pil.size, (255,255,255))
-            tmp.paste(pil, mask=pil.split()[3])
-            pil = tmp
-        expr, sol = predict_expr(pil)
-        emo = random.choice(["😎","😊","🤔","🫡","👍","😉","🙂"])
+        pil_img = Image.fromarray(data, "RGBA")
+        if pil_img.mode == "RGBA":
+            tmp = Image.new("RGB", pil_img.size, (255,255,255))
+            tmp.paste(pil_img, mask=pil_img.split()[3])
+            pil_img = tmp
+        expr, sol = predict_expr(pil_img)
+        emo = random.choice(["😎", "😊", "🤔", "🫡", "👍", "😉", "🙂"])
         st.write(f"**Recognized:** {expr}")
         st.write(f"**Solution:** {sol} {emo}")
     else:
