@@ -151,7 +151,6 @@ tensorflow-io-gcs-filesystem==0.37.1
 tensorflow-metadata==1.16.1
 termcolor==2.5.0
 terminado==0.18.1
-tfds-nightly==4.9.3.dev202311230044
 threadpoolctl==3.6.0
 tinycss2==1.4.0
 toml==0.10.2
