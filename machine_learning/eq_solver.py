@@ -6,6 +6,19 @@ import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import os, random
 
+st.markdown(
+    """
+    <style>
+    /* Force a white background on the main elements */
+    html, body, [data-testid="stAppViewContainer"] {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
