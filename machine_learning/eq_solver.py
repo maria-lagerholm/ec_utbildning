@@ -10,7 +10,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
+model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.h5")
 model = tf.keras.models.load_model(model_path, compile=False)
 labels = list("0123456789") + ["+", "-"]
 
