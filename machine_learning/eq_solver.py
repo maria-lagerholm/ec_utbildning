@@ -44,7 +44,7 @@ def predict_expr(pil_img):
     for c in chunks:
         c = c.astype(np.float32) / 255.0
         c = c.reshape((1, 28, 28, 1))
-        p = model.predict(c, verbose=1).argmax()
+        p = model.predict(c, verbose=0).argmax()
         preds.append(labels[p])
     expr = "".join(preds)
     try:
