@@ -9,19 +9,6 @@ import os, random
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
-st.markdown(
-    """
-    <style>
-    /* Force a white background on the main elements */
-    html, body, [data-testid="stAppViewContainer"] {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path)
