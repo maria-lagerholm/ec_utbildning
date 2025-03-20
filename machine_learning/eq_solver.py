@@ -10,7 +10,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.h5")
+model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
 model = tf.keras.models.load_model(model_path, compile=False)
 labels = list("0123456789") + ["+", "-"]
 
@@ -44,13 +44,13 @@ def predict_expr(pil_img):
     for c in chunks:
         c = c.astype(np.float32) / 255.0
         c = c.reshape((1, 28, 28, 1))
-        p = model.predict(c, verbose=0).argmax()
+        p = model(c, training=False).numpy().argmax()
         preds.append(labels[p])
     expr = "".join(preds)
     try:
         ans = eval(expr)
-    except:
-        ans = "Could not evaluate"
+    except Exception as e:
+        ans = f"Could not evaluate: {str(e)}"
     return expr, ans
 
 st.title("Handwritten Math Solver")
