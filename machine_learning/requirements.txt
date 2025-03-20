@@ -74,6 +74,7 @@ jupyterlab==4.3.6
 jupyterlab_pygments==0.3.0
 jupyterlab_server==2.27.3
 jupyterlab_widgets==3.0.13
+keras==3.9.0
 keras-nightly==3.9.0.dev2025032003
 keras-tuner==1.4.7
 kiwisolver==1.4.7
