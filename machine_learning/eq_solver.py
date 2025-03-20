@@ -1,8 +1,8 @@
 import streamlit as st
 import numpy as np
 import cv2
-from PIL import Image, ImageOps
-import keras
+from PIL import Image
+import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import os, random
 
@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
-model = keras.models.load_model(model_path, compile=False)
+model = tf.keras.models.load_model(model_path, compile=False)
 labels = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, pad=20):
