@@ -44,7 +44,7 @@ def predict_expr(pil_img):
     for c in chunks:
         c = c.astype(np.float32) / 255.0
         c = c.reshape((1, 28, 28, 1))
-        p = model.predict(c, verbose=10).argmax()
+        p = model.predict(c, verbose=0).argmax()
         preds.append(labels[p])
     expr = "".join(preds)
     try:
@@ -54,7 +54,7 @@ def predict_expr(pil_img):
     return expr, ans
 
 st.title("Handwritten Math Solver")
-#st.markdown('<style>h1{font-size:30px;}</style>', unsafe_allow_html=True)
+st.markdown('<style>h1{font-size:30px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
 
