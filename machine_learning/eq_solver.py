@@ -11,7 +11,7 @@ st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
-model = tf.keras.models.load_model(model_path)
+model = tf.keras.models.load_model(model_path, compile=False)
 labels = list("0123456789") + ["+", "-"]
 
 def center_symbol(img, size=28, pad=20):
@@ -44,7 +44,7 @@ def predict_expr(pil_img):
     for c in chunks:
         c = c.astype(np.float32) / 255.0
         c = c.reshape((1, 28, 28, 1))
-        p = model.predict(c).argmax()
+        p = model.predict(c, verbose=0).argmax()
         preds.append(labels[p])
     expr = "".join(preds)
     try:
@@ -54,7 +54,7 @@ def predict_expr(pil_img):
     return expr, ans
 
 st.title("Handwritten Math Solver")
-st.markdown('<style>h1{font-size:14px;}</style>', unsafe_allow_html=True)
+st.markdown('<style>h1{font-size:30px;}</style>', unsafe_allow_html=True)
 st.write("Draw digits and + or - signs clearly below:")
 
 
