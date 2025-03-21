@@ -13,7 +13,7 @@ This project recognizes handwritten **digits** and **operators** (`+`, `-`) and 
 - The model **recognizes digits and operators**.  
 - The app segments the numbers and the operators, then **calculates the result** and displays it.  
 
-## Wake the app up if it's sleeping! It takes some time to load. :) 
+## Wake the app up if it's sleeping! It takes some time to load. :) Also change the theme to light for better visibility. 
 
 https://eq-solver.streamlit.app/
 
