@@ -3,7 +3,7 @@
 This project recognizes handwritten **digits** and **operators** (`+`, `-`) and solves simple math equations.  
 
 
-1. I tried **Logistic Regression, SVM, and CNN** on the **MNIST dataset**.  
+1. I tried **Logistic Regression, SVM and CNN** on the **MNIST dataset**.  
 2. **CNN performed best**, so I used it for the final model.  
 3. I augmented and expanded the dataset by adding **synthetic handwritten + and - signs** as well as some varriations to the digits positions - rotation, size, etc.  
 
