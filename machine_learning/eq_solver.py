@@ -8,11 +8,21 @@ import os, random
 
 st.set_page_config(layout="wide")
 
-# Disable forced dark mode from browsers
+# Aggressive forced-light-mode CSS
 st.markdown("""
     <style>
-        html {
+        html, body, [class*="css"] {
             color-scheme: light !important;
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+            filter: none !important;
+        }
+
+        /* Override Streamlit elements explicitly */
+        .stApp, .stApp header, .stApp section, .stApp div {
+            background-color: #FFFFFF !important;
+            color: #000000 !important;
+            filter: none !important;
         }
     </style>
 """, unsafe_allow_html=True)
