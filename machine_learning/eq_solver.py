@@ -6,6 +6,15 @@ import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import os, random
 
+# Disable forced dark mode from browsers
+st.markdown("""
+    <style>
+        html {
+            color-scheme: light !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 st.set_page_config(layout="wide")
 
