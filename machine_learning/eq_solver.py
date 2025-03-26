@@ -8,23 +8,30 @@ import os, random
 
 st.set_page_config(layout="wide")
 
-# Aggressive forced-light-mode CSS
+# Minimal CSS targeting only the drawable canvas toolbar
 st.markdown("""
-    <style>
-        html, body, [class*="css"] {
-            color-scheme: light !important;
-            background-color: #FFFFFF !important;
-            color: #000000 !important;
-            filter: none !important;
-        }
+<style>
+    /* canvas toolbar */
+    .literally .lc-picker, 
+    .literally .lc-options, 
+    .literally .lc-tools {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        filter: none !important;
+    }
 
-        /* Override Streamlit elements explicitly */
-        .stApp, .stApp header, .stApp section, .stApp div {
-            background-color: #FFFFFF !important;
-            color: #000000 !important;
-            filter: none !important;
-        }
-    </style>
+    .literally .lc-tool, 
+    .literally .lc-tool-selected,
+    .literally .lc-button {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        filter: none !important;
+    }
+
+    .literally .lc-icon svg {
+        fill: #000000 !important;
+    }
+</style>
 """, unsafe_allow_html=True)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
