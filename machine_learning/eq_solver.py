@@ -6,6 +6,8 @@ import tensorflow as tf
 from streamlit_drawable_canvas import st_canvas
 import os, random
 
+st.set_page_config(layout="wide")
+
 # Disable forced dark mode from browsers
 st.markdown("""
     <style>
@@ -16,7 +18,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-st.set_page_config(layout="wide")
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(this_dir, "joblib", "cnn_model_aug.keras")
