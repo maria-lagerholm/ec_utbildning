@@ -7,43 +7,6 @@ from streamlit_drawable_canvas import st_canvas
 import os, random
 
 st.set_page_config(layout="wide")
-
-# Targeted CSS for Canvas toolbar (fully visible buttons)
-st.markdown("""
-<style>
-    /* Canvas toolbar background */
-    .literally .lc-picker, 
-    .literally .lc-options, 
-    .literally .lc-tools {
-        background-color: #FFFFFF !important;
-        filter: none !important;
-    }
-
-    /* Individual toolbar buttons */
-    .literally .lc-tool, 
-    .literally .lc-tool-selected,
-    .literally .lc-button {
-        background-color: #FFFFFF !important;
-        filter: none !important;
-    }
-
-    /* SVG icons inside toolbar buttons */
-    .literally .lc-tool svg,
-    .literally .lc-button svg {
-        fill: #000000 !important;  /* Ensures icons are visible (black) */
-    }
-
-    /* Ensures picker contents (e.g., colors, stroke-width pickers) are also visible */
-    .literally .lc-picker-contents, 
-    .literally .lc-color-picker, 
-    .literally .lc-stroke-width-picker {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        filter: none !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
