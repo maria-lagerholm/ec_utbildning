@@ -1,0 +1,85 @@
+```yaml
+---
+title: "Car Ownership Cost Analysis"
+author: "Maria and Geisol"
+output: html_document
+---
+
+
+# Introduction
+
+In this project, we analyze webscraped car ad data (from Blocket) along with vehicle data from Transportstyrelsen and insurance estimates.  
+Our goal is to build a linear model to predict the **yearly cost of car ownership**.
+
+---
+
+# Load Packages
+
+```{r setup, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readxl)
+
+
+# Read the data into R (adjust file name if needed)
+cars_raw <- read_excel("dataset_final.xlsx")
+
+# Step 1: Convert text values that look numeric to actual numeric (e.g. "1042" → 1042)
+cars_clean <- cars_raw %>%
+  mutate(across(
+    where(is.character),
+    ~ ifelse(
+        grepl("^[0-9.,]+$", .x),
+        suppressWarnings(as.numeric(gsub(",", "", .x))),
+        .x
+      )
+  )) %>%
+  mutate(`Energiförbrukning (Wh/km)` = replace_na(as.numeric(`Energiförbrukning (Wh/km)`), 0))
+
+glimpse(cars_clean)
+
+
+#As a quick rule of thumb, a car will lose between 15 percent and 20 percent of its value each year.
+#https://exchange.aaa.com/automotive/car-buying-and-selling/car-resale-value
+#“If I buy this used car today for 120000 kr, how much will it lose in value each year going forward?”
+#Värdeminskning per år=pris×0.15
+
+cars_clean$"Värdeminskning (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.15, 0)
+
+
+## Om jag betalar 20% själv och lånar resten med 7,45% årliga ränta, så visar detta hur mycket jag betalar i räntekostnad per år.
+cars_clean$"Lån (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.80 * 0.0745, 0)
+
+
+# Ange aktuella bränslepriser (kr per liter eller kWh)
+pris_bensin <- 15.54   # kr/liter
+pris_diesel <- 16.59   # kr/liter
+pris_el <- 1.50        # kr/kWh
+
+# Skapa kolumnen 'Förbrukning' baserat på bränsletyp och förbrukning
+cars_clean$"Drivmedelskostnad (kr) för 10000 km" <- NA  # Initiera kolumnen
+
+# Bensin
+bensin_index <- grepl("Bensin", cars_clean$Bränsle, ignore.case = TRUE)
+cars_clean$"Drivmedelskostnad (kr) för 10000 km"[bensin_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[bensin_index] * 100 * pris_bensin, 0)
+
+# Diesel
+diesel_index <- grepl("Diesel", cars_clean$Bränsle, ignore.case = TRUE)
+cars_clean$"Drivmedelskostnad (kr) för 10000 km"[diesel_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[diesel_index] * 100 * pris_diesel, 0)
+
+# Miljöbränsle/Hybrid
+hybrid_index <- grepl("Miljöbränsle|Hybrid", cars_clean$Bränsle, ignore.case = TRUE)
+cars_clean$"Drivmedelskostnad (kr) för 10000 km"[hybrid_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[hybrid_index] * 100 * pris_bensin, 0)
+
+# Elbilar (endast el)
+elbilar_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
+cars_clean$"Drivmedelskostnad (kr) för 10000 km"[elbilar_index] <- round((cars_clean$`Energiförbrukning (Wh/km)`[elbilar_index] / 1000) * 10000 * pris_el, 0)
+
+# Laddhybrider (både el och bränsle)
+laddhybrid_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & !is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
+# Anta att 50% av körningen sker på el och 50% på bränsle
+el_kostnad <- (cars_clean$`Energiförbrukning (Wh/km)`[laddhybrid_index] / 1000) * 5000 * pris_el
+bränsle_kostnad <- cars_clean$`Bränsleförbrukning (l / 100 km)`[laddhybrid_index] * 50 * pris_bensin
+cars_clean$"Drivmedelskostnad (kr) för 10000 km"[laddhybrid_index] <- round(el_kostnad + bränsle_kostnad, 0)
+
+
+
