@@ -1,7 +1,7 @@
 ```yaml
 ---
 title: "Car Ownership Cost Analysis"
-author: "Maria and Geisol"
+authors: "Geisol and Maria"
 output: html_document
 ---
 
@@ -13,17 +13,18 @@ Our goal is to build a linear model to predict the **yearly cost of car ownershi
 
 ---
 
-# Load Packages
 
 ```{r setup, message=FALSE, warning=FALSE}
+# Load Packages
 library(tidyverse)
 library(readxl)
-
+install.packages("fastDummies")
+library(fastDummies)
 
 # Read the data into R (adjust file name if needed)
 cars_raw <- read_excel("dataset_final.xlsx")
 
-# Step 1: Convert text values that look numeric to actual numeric (e.g. "1042" → 1042)
+# Step 1: Convert character columns that look numeric (e.g., "1042") into actual numbers
 cars_clean <- cars_raw %>%
   mutate(across(
     where(is.character),
@@ -33,32 +34,30 @@ cars_clean <- cars_raw %>%
         .x
       )
   )) %>%
+  # Step 2: Convert energy consumption to numeric and replace NAs with 0
   mutate(`Energiförbrukning (Wh/km)` = replace_na(as.numeric(`Energiförbrukning (Wh/km)`), 0))
 
 glimpse(cars_clean)
 
-
-#As a quick rule of thumb, a car will lose between 15 percent and 20 percent of its value each year.
-#https://exchange.aaa.com/automotive/car-buying-and-selling/car-resale-value
-#“If I buy this used car today for 120000 kr, how much will it lose in value each year going forward?”
-#Värdeminskning per år=pris×0.15
+# Rule of thumb: a car loses between 15–20% of its value per year
+# Source: https://exchange.aaa.com/automotive/car-buying-and-selling/car-resale-value
+# “If I buy this used car today for 120000 kr, how much will it lose in value each year going forward?”
+# Annual depreciation = price × 0.15
 
 cars_clean$"Värdeminskning (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.15, 0)
 
-
-## Om jag betalar 20% själv och lånar resten med 7,45% årliga ränta, så visar detta hur mycket jag betalar i räntekostnad per år.
+# If I pay 20% myself and borrow the rest at 7.45% annual interest, this shows how much I pay in interest cost per year
 cars_clean$"Lån (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.80 * 0.0745, 0)
 
-
-# Ange aktuella bränslepriser (kr per liter eller kWh)
+# Set current fuel and electricity prices (kr per liter or kWh)
 pris_bensin <- 15.54   # kr/liter
 pris_diesel <- 16.59   # kr/liter
 pris_el <- 1.50        # kr/kWh
 
-# Skapa kolumnen 'Förbrukning' baserat på bränsletyp och förbrukning
-cars_clean$"Drivmedelskostnad (kr) för 10000 km" <- NA  # Initiera kolumnen
+# Create column for fuel cost based on fuel type and consumption
+cars_clean$"Drivmedelskostnad (kr) för 10000 km" <- NA  # Initialize column
 
-# Bensin
+# Bensin (Gasoline)
 bensin_index <- grepl("Bensin", cars_clean$Bränsle, ignore.case = TRUE)
 cars_clean$"Drivmedelskostnad (kr) för 10000 km"[bensin_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[bensin_index] * 100 * pris_bensin, 0)
 
@@ -66,20 +65,149 @@ cars_clean$"Drivmedelskostnad (kr) för 10000 km"[bensin_index] <- round(cars_cl
 diesel_index <- grepl("Diesel", cars_clean$Bränsle, ignore.case = TRUE)
 cars_clean$"Drivmedelskostnad (kr) för 10000 km"[diesel_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[diesel_index] * 100 * pris_diesel, 0)
 
-# Miljöbränsle/Hybrid
+# Hybrid or environmentally friendly fuel
 hybrid_index <- grepl("Miljöbränsle|Hybrid", cars_clean$Bränsle, ignore.case = TRUE)
 cars_clean$"Drivmedelskostnad (kr) för 10000 km"[hybrid_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[hybrid_index] * 100 * pris_bensin, 0)
 
-# Elbilar (endast el)
+# Electric cars (electricity only)
 elbilar_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
 cars_clean$"Drivmedelskostnad (kr) för 10000 km"[elbilar_index] <- round((cars_clean$`Energiförbrukning (Wh/km)`[elbilar_index] / 1000) * 10000 * pris_el, 0)
 
-# Laddhybrider (både el och bränsle)
+# Plug-in hybrids (both electricity and fuel)
 laddhybrid_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & !is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
-# Anta att 50% av körningen sker på el och 50% på bränsle
+
+# Assume 50% of driving is electric and 50% is fuel-based
 el_kostnad <- (cars_clean$`Energiförbrukning (Wh/km)`[laddhybrid_index] / 1000) * 5000 * pris_el
 bränsle_kostnad <- cars_clean$`Bränsleförbrukning (l / 100 km)`[laddhybrid_index] * 50 * pris_bensin
 cars_clean$"Drivmedelskostnad (kr) för 10000 km"[laddhybrid_index] <- round(el_kostnad + bränsle_kostnad, 0)
+
+# To avoid multicollinearity in regression (i.e. one variable being a perfect combination of others),
+# we use k–1 dummy variables for k categories
+
+cars_clean <- dummy_cols(
+  cars_clean,
+  select_columns = "Bränsle",
+  remove_first_dummy = TRUE,    # avoid multicollinearity (El as reference)
+  remove_selected_columns = TRUE
+)
+
+# Replace values in 'Biltyp' by grouping them into broader categories
+cars_clean$Biltyp <- case_when(
+  cars_clean$Biltyp %in% c("Halvkombi", "Kombi", "Sedan") ~ "Personbil",             # standard passenger cars
+  cars_clean$Biltyp %in% c("SUV", "Familjebuss", "Yrkesfordon", "Skåpbil") ~ "Storbil",  # larger vehicles
+  cars_clean$Biltyp %in% c("Coupé", "Cab") ~ "Sportbil",                             # sportier body types
+  TRUE ~ "Annat"                                                                     # catch-all for unknown types
+)
+
+# Convert 'Biltyp' to factor (required for dummy variable creation)
+cars_clean$Biltyp <- factor(cars_clean$Biltyp)
+
+# Create dummy variables for each grouped vehicle type (excluding reference)
+biltyp_dummies <- model.matrix(~ Biltyp, data = cars_clean)[, -1]  # remove intercept
+cars_clean <- cbind(cars_clean, biltyp_dummies)
+
+
+__________________________________________________________
+
+# Create the column 'Ägandekostnad (kr) per år' which sums all recurring yearly ownership costs
+
+# Note:
+# - The 20% down payment (the part we paid from our savings) is not included in the yearly cost,
+#   as it is a one-time expense and does not impact ongoing ownership costs.
+# - We also do not account for unpredictable costs such as repairs, accidents, insurance deductibles, or parts replacement.
+
+cars_clean$`Ägandekostnad (kr) per år` <- round(
+  cars_clean$`Fordonsskatt (kr / år)` +                      # vehicle tax
+  cars_clean$`Helförsäkring (kr / år)` +                     # insurance
+  cars_clean$`Lån (kr) per år` +                              # loan interest
+  cars_clean$`Drivmedelskostnad (kr) för 10000 km` +          # fuel or electricity
+  cars_clean$`Värdeminskning (kr) per år` +                   # annual depreciation
+  800 +                                                       # tire wear
+  4000,                                                       # service
+  0                                                           # round to whole kronor
+)
+
+# Create a column for monthly ownership cost (rounded to whole kronor)
+cars_clean$`Ägandekostnad (kr) per månad` <- round(cars_clean$`Ägandekostnad (kr) per år` / 12, 0)
+
+____________________________________________________________
+
+Here begins EDA
+
+install.packages("corrplot")
+library(corrplot)
+
+#Remove variables that we alredy know (ex. Derived directly from Pris or Koldioxidutsläpp vs Bränsleförbrukning) are highly correlated with the target or redundant with each other
+
+# 2. Remove specific columns that are either redundant or derived from each other
+cols_to_remove <- c(
+  "Pris (kr)",
+  "Värdeminskning (kr) per år",
+  "Lån (kr) per år",
+  "Ägandekostnad (kr) per månad",
+  "Koldioxidutsläpp blandad (NEDC) g/km"
+)
+
+# 3. Filter the cleaned set
+numeric_filtered <- numeric_cols %>%
+  select(-all_of(cols_to_remove))
+  
+# 4. Compute and plot the correlation matrix
+cor_matrix_cleaned <- cor(numeric_filtered, use = "complete.obs")
+
+corrplot(
+  cor_matrix_cleaned,
+  method = "color",
+  type = "upper",
+  tl.cex = 0.8,
+  number.cex = 0.7,
+  tl.col = "black",
+  addCoef.col = "black"
+)
+
+
+# Remove columns that are weakly correlated or redundant with stronger predictors
+# The goal is to simplify the model while preserving predictive power
+
+# Remove variables that are weakly correlated or redundant with stronger predictors
+# Goal: simplify the model while preserving interpretability and avoiding multicollinearity
+
+cars_model <- cars_clean %>%
+  select(
+    -`Bränsleförbrukning (l / 100 km)`,         # Correlated at 0.97 with Drivmedelskostnad — redundant
+    -`Mätarställning (km)`,                     # Weak correlation (–0.24); unlikely to predict yearly cost
+    -Bränsle_Diesel, 
+    -Bränsle_El, 
+    -`Bränsle_Miljöbränsle/Hybrid`,             # Low correlation (~0.1); already captured by drivmedelskostnad
+    -BiltypPersonbil, 
+    -BiltypSportbil, 
+    -BiltypStorbil                              # Weak influence (–0.2 to +0.1); can be dropped for clarity
+  )
+
+____________________________________________________________
+
+#Building the model
+
+install.packages("rsample")
+library(rsample)
+
+set.seed(123)  # for reproducibility
+
+# First: split into training+validation and test sets (80/20)
+split_1 <- initial_split(cars_model, prop = 0.8)
+train_val <- training(split_1)
+test <- testing(split_1)
+
+# Further split train+val into train (70%) and validation (30%)
+set.seed(123)
+
+split_2 <- initial_split(train_val, prop = 0.7)
+train <- training(split_2)
+val <- testing(split_2)
+
+#one should aim to have at least 10–15 rows per feature in a regression model. We are using <15 features - safe!
+
+nrow(train) / ncol(train) # >10 → you're good
 
 
 
