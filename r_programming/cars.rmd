@@ -9,7 +9,7 @@ output: html_document
 # Introduction
 
 In this project, we analyze webscraped car ad data (from Blocket) along with vehicle data from Transportstyrelsen and insurance estimates.  
-Our goal is to build a linear model to predict the **yearly cost of car ownership**.
+Our goal is to build a linear model to predict the yearly cost of car ownership.
 
 ---
 
@@ -20,6 +20,17 @@ library(tidyverse)
 library(readxl)
 install.packages("fastDummies")
 library(fastDummies)
+install.packages("corrplot")
+library(corrplot)
+install.packages("rsample")
+library(rsample)
+install.packages("GGally")
+library(GGally)
+library(ggplot2)
+library(dplyr)
+install.packages("ggcorrplot")
+library(ggcorrplot)
+
 
 # Read the data into R (adjust file name if needed)
 cars_raw <- read_excel("dataset_final.xlsx")
@@ -84,31 +95,112 @@ cars_clean$"Drivmedelskostnad (kr) för 10000 km"[laddhybrid_index] <- round(el_
 # To avoid multicollinearity in regression (i.e. one variable being a perfect combination of others),
 # we use k–1 dummy variables for k categories
 
+
+
+
+library(fastDummies)
+
+# 1. Skapa dummyvariabler för Bränsle (men använd faktorer i modellen)
 cars_clean <- dummy_cols(
   cars_clean,
   select_columns = "Bränsle",
-  remove_first_dummy = TRUE,    # avoid multicollinearity (El as reference)
-  remove_selected_columns = TRUE
+  remove_first_dummy = TRUE,    # referenskategori: El
+  remove_selected_columns = FALSE
 )
-
-# Replace values in 'Biltyp' by grouping them into broader categories
-cars_clean$Biltyp <- case_when(
-  cars_clean$Biltyp %in% c("Halvkombi", "Kombi", "Sedan") ~ "Personbil",             # standard passenger cars
-  cars_clean$Biltyp %in% c("SUV", "Familjebuss", "Yrkesfordon", "Skåpbil") ~ "Storbil",  # larger vehicles
-  cars_clean$Biltyp %in% c("Coupé", "Cab") ~ "Sportbil",                             # sportier body types
-  TRUE ~ "Annat"                                                                     # catch-all for unknown types
-)
-
-# Convert 'Biltyp' to factor (required for dummy variable creation)
-cars_clean$Biltyp <- factor(cars_clean$Biltyp)
-
-# Create dummy variables for each grouped vehicle type (excluding reference)
-biltyp_dummies <- model.matrix(~ Biltyp, data = cars_clean)[, -1]  # remove intercept
-cars_clean <- cbind(cars_clean, biltyp_dummies)
+cars_clean$Bränsle <- factor(cars_clean$Bränsle)
+cars_clean$Bränsle <- relevel(cars_clean$Bränsle, ref = "El")
 
 
-__________________________________________________________
+# 2. Gruppindela Biltyp till färre kategorier
+cars_clean <- cars_clean %>%
+  mutate(
+    Biltyp = case_when(
+      Biltyp %in% c("Halvkombi", "Kombi", "Sedan") ~ "Personbil",
+      Biltyp %in% c("SUV", "Familjebuss", "Yrkesfordon", "Skåpbil") ~ "Storbil",
+      Biltyp %in% c("Coupé", "Cab") ~ "Sportbil",
+      TRUE ~ "Annat"
+    ),
+    Biltyp = factor(Biltyp)
+  )
 
+# 3. Skapa slutlig modell-dataset där vi använder *bara* faktorer
+cars_clean_inf <- cars_clean %>%
+  mutate(
+    Helförsäkring_log = log(`Helförsäkring (kr / år)`),
+    Pris_log = log(`Pris (kr)`),
+    Skatt_log = log(`Fordonsskatt (kr / år)` + 1),
+    Mätar_log = log(`Mätarställning (km)` + 1),
+    CO2_log = log(`Koldioxidutsläpp blandad (NEDC) g/km` + 1),
+    Bränsleförb_log = log(`Bränsleförbrukning (l / 100 km)` + 1)
+  ) %>%
+  select(
+    Helförsäkring_log,
+    Hästkrafter,
+    Modellår,
+    Mätar_log,
+    CO2_log,
+    Bränsleförb_log,
+    Bränsle,
+    Biltyp,
+    Pris_log,
+    Skatt_log
+  )
+
+
+glimpse(cars_clean_inf)
+
+# Correlation with Helförsäkringen as target
+#Pearson-korrelationen fångar endast linjära samband, men vi kan ändå ta bort variablerna som har mycket hög korrelation
+cars_clean_inf %>%
+  select_if(is.numeric) %>%
+  summarise(across(everything(), ~ cor(.x, cars_clean_inf[["Helförsäkring_log"]], use = "complete.obs"))) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Correlation") %>%
+  arrange(desc(abs(Correlation)))
+
+
+
+
+
+# We now train model with AIC that means it will only take in those features that are meaningful
+model_f <- lm(`Helförsäkring_log` ~ ., data = cars_clean_inf)
+summary(model_f)
+confint(model_f)
+
+
+plot(model_f)
+library(car)
+vif(model_f)
+
+____________________________________________________________
+#statistical inference
+#Use the entire dataset (cars_model) for one regression model
+#Report: summary(model), p-values, confidence intervals, and interpretations
+
+Statistical inference
+
+# Försäkringens beroende av hästkrafter, modellår, bränsletyp etc.
+mod_forsakring <- lm(`Helförsäkring (kr / år)` ~ Hästkrafter + Modellår + Bränsle_Diesel + Bränsle_El, data = cars_clean)
+
+# Fordonsskattens beroende av modellår, hästkrafter etc.
+mod_skatt <- lm(`Fordonsskatt (kr / år)` ~ Modellår + Hästkrafter + Bränsle_Diesel + Bränsle_El, data = cars_clean)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+________________________________________
 # Create the column 'Ägandekostnad (kr) per år' which sums all recurring yearly ownership costs
 
 # Note:
@@ -126,33 +218,31 @@ cars_clean$`Ägandekostnad (kr) per år` <- round(
   4000,                                                       # service
   0                                                           # round to whole kronor
 )
-
-# Create a column for monthly ownership cost (rounded to whole kronor)
-cars_clean$`Ägandekostnad (kr) per månad` <- round(cars_clean$`Ägandekostnad (kr) per år` / 12, 0)
-
-____________________________________________________________
+________________________________________________________________
 
 Here begins EDA
 
-install.packages("corrplot")
-library(corrplot)
 
 #Remove variables that we alredy know (ex. Derived directly from Pris or Koldioxidutsläpp vs Bränsleförbrukning) are highly correlated with the target or redundant with each other
 
-# 2. Remove specific columns that are either redundant or derived from each other
+# Select only numeric columns
+numeric_cols <- cars_clean %>%
+  select(where(is.numeric))
+
+# Remove specific columns that are either redundant or derived from each other
 cols_to_remove <- c(
   "Pris (kr)",
   "Värdeminskning (kr) per år",
   "Lån (kr) per år",
-  "Ägandekostnad (kr) per månad",
   "Koldioxidutsläpp blandad (NEDC) g/km"
 )
 
-# 3. Filter the cleaned set
+# Filter the cleaned set
 numeric_filtered <- numeric_cols %>%
   select(-all_of(cols_to_remove))
+
   
-# 4. Compute and plot the correlation matrix
+# Compute and plot the correlation matrix
 cor_matrix_cleaned <- cor(numeric_filtered, use = "complete.obs")
 
 corrplot(
@@ -174,22 +264,74 @@ corrplot(
 
 cars_model <- cars_clean %>%
   select(
-    -`Bränsleförbrukning (l / 100 km)`,         # Correlated at 0.97 with Drivmedelskostnad — redundant
-    -`Mätarställning (km)`,                     # Weak correlation (–0.24); unlikely to predict yearly cost
-    -Bränsle_Diesel, 
-    -Bränsle_El, 
-    -`Bränsle_Miljöbränsle/Hybrid`,             # Low correlation (~0.1); already captured by drivmedelskostnad
-    -BiltypPersonbil, 
-    -BiltypSportbil, 
-    -BiltypStorbil                              # Weak influence (–0.2 to +0.1); can be dropped for clarity
+    `Ägandekostnad (kr) per år`,     # 🎯 Target variable we're predicting
+
+    # Keep these predictors (they are independent and showed predictive value)
+    Hästkrafter,                     # Strong linear relationship with cost — significant predictor
+    Modellår,                        # Newer cars tend to cost more — significant
+    `Mätarställning (km)`,          # Optional — weak to moderate effect, but useful to test
+    Bränsle_Diesel,                 # Fuel type dummy — significant positive effect on cost
+    Bränsle_El,                     # Fuel type dummy — significantly reduces cost
+    `Bränsle_Miljöbränsle/Hybrid`   # Fuel type dummy — moderately reduces cost
+
+    # Remove the following:
+    # - BiltypPersonbil
+    # - BiltypSportbil
+    # - BiltypStorbil
+    # Reason: All three had high p-values in the linear model (not statistically significant)
+    #         and did not meaningfully contribute to predicting ownership cost.
+    #         Removing them simplifies the model without hurting performance.
+
+    # Also already excluded in earlier steps:
+    # - Pris, Värdeminskning, Lån, Försäkring, Skatt, Drivmedelskostnad, Energiförbrukning
+    # Because they were either directly used to compute the target or introduce target leakage
   )
 
-____________________________________________________________
 
-#Building the model
 
-install.packages("rsample")
-library(rsample)
+# visualize how each numeric predictor relates to your target.
+#“Do we have multicollinearity?” Yes
+ggpairs(select(cars_model, where(is.numeric)))
+
+library(tidyr)
+library(dplyr)
+
+# 1. Select numeric predictors, excluding the target
+num_predictors <- cars_model %>%
+  select(where(is.numeric)) %>%
+  select(-`Ägandekostnad (kr) per år`)
+
+# 2. Add the target back for plotting
+plot_data <- bind_cols(
+  num_predictors,
+  Ägandekostnad = cars_model$`Ägandekostnad (kr) per år`
+)
+
+# Convert to long format for ggplot
+plot_data_long <- plot_data %>%
+  pivot_longer(cols = -Ägandekostnad, names_to = "Variable", values_to = "Value")
+
+library(ggplot2)
+
+ggplot(plot_data_long, aes(x = Value, y = Ägandekostnad)) +
+  geom_point(alpha = 0.3, size = 0.8) +
+  geom_smooth(method = "loess", se = FALSE, color = "steelblue") +
+  facet_wrap(~ Variable, scales = "free_x") +
+  theme_minimal() +
+  labs(
+    title = "Predictors vs Yearly Ownership Cost",
+    x = "Predictor Value",
+    y = "Ownership Cost (kr/year)"
+  )
+
+
+
+____________________________________________________
+#Building the predictive model
+#Use a train/val/test split
+#Fit the model on train, evaluate on val
+#Report RMSE, R²
+#Mention how well the model generalizes
 
 set.seed(123)  # for reproducibility
 
@@ -207,7 +349,13 @@ val <- testing(split_2)
 
 #one should aim to have at least 10–15 rows per feature in a regression model. We are using <15 features - safe!
 
-nrow(train) / ncol(train) # >10 → you're good
+nrow(train) / ncol(train) # >10 → we're good
 
 
+
+# Build a linear model using all remaining predictors
+model_lm <- lm(`Ägandekostnad (kr) per år` ~ ., data = train)
+
+# View model summary
+summary(model_lm)
 
