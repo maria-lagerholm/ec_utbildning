@@ -1,41 +1,52 @@
-```yaml
 ---
-title: "Car Ownership Cost Analysis"
-authors: "Geisol and Maria"
-output: html_document
+title: "Blocket Car Analysis"
+author:
+  - Geisol
+  - Maria
+format: html
 ---
-
 
 # Introduction
 
-In this project, we analyze webscraped car ad data (from Blocket) along with vehicle data from Transportstyrelsen and insurance estimates.  
-Our goal is to build a linear model to predict the yearly cost of car ownership.
+In this project, we analyze web-scraped used car listings from Blocket, enriched with technical specifications from Transportstyrelsen and cost estimates for insurance and taxation in Sweden. The primary goal has shifted from estimating total yearly ownership cost to two main objectives:
+(1) Predicting market prices for used cars in Sweden, with a focus on non-premium, mid-range vehicles, and
+(2) Gaining statistical insight into what factors influence insurance premiums and vehicle taxes, using linear regression models.
+
+By combining predictive modeling (e.g., random forest) with inference-driven approaches (e.g., linear regression), we aim to both improve price prediction accuracy and interpret underlying patterns in insurance and tax structures in the Swedish car market.
+
 
 ---
 
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| results: hide      # <‑ add this if you want zero printed output
 
-```{r setup, message=FALSE, warning=FALSE}
-# Load Packages
-library(tidyverse)
-library(readxl)
-install.packages("fastDummies")
-library(fastDummies)
-install.packages("corrplot")
-library(corrplot)
-install.packages("rsample")
-library(rsample)
-install.packages("GGally")
-library(GGally)
-library(ggplot2)
-library(dplyr)
-install.packages("ggcorrplot")
-library(ggcorrplot)
+packages <- c(
+  "tidyverse", "readxl", "fastDummies", "corrplot",
+  "rsample", "GGally", "ggcorrplot", "car", "xgboost", "yardstick", "tibble", "ranger", "glmnet", "vip"
+)
+
+idx <- packages %in% rownames(installed.packages())
+if (any(!idx)) install.packages(packages[!idx])
+
+suppressPackageStartupMessages(
+  invisible(lapply(packages, library, character.only = TRUE))
+)
+```
 
 
-# Read the data into R (adjust file name if needed)
+
+```{r}
+#| label: import-and-clean
+#| message: false
+#| warning: false
+
+# Read the data (adjust file name/path if needed) -------------------------
 cars_raw <- read_excel("dataset_final.xlsx")
 
-# Step 1: Convert character columns that look numeric (e.g., "1042") into actual numbers
+# 1. Convert character columns that look numeric into numeric --------------
 cars_clean <- cars_raw %>%
   mutate(across(
     where(is.character),
@@ -45,317 +56,330 @@ cars_clean <- cars_raw %>%
         .x
       )
   )) %>%
-  # Step 2: Convert energy consumption to numeric and replace NAs with 0
-  mutate(`Energiförbrukning (Wh/km)` = replace_na(as.numeric(`Energiförbrukning (Wh/km)`), 0))
+  # 2. Convert energy consumption to numeric and replace NAs with 0 --------
+  mutate(`Energiförbrukning (Wh/km)` = replace_na(as.numeric(`Energiförbrukning (Wh/km)`), 0)) %>%
+  # 3. Convert Modellår to factor ------------------------------------------
+  mutate(Modellår = factor(Modellår)) %>%
+  # 4. Remove Biltyp completely --------------------------------------------
+  select(-Biltyp)
 
 glimpse(cars_clean)
 
-# Rule of thumb: a car loses between 15–20% of its value per year
-# Source: https://exchange.aaa.com/automotive/car-buying-and-selling/car-resale-value
-# “If I buy this used car today for 120000 kr, how much will it lose in value each year going forward?”
-# Annual depreciation = price × 0.15
-
-cars_clean$"Värdeminskning (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.15, 0)
-
-# If I pay 20% myself and borrow the rest at 7.45% annual interest, this shows how much I pay in interest cost per year
-cars_clean$"Lån (kr) per år" <- round(cars_clean$`Pris (kr)` * 0.80 * 0.0745, 0)
-
-# Set current fuel and electricity prices (kr per liter or kWh)
-pris_bensin <- 15.54   # kr/liter
-pris_diesel <- 16.59   # kr/liter
-pris_el <- 1.50        # kr/kWh
-
-# Create column for fuel cost based on fuel type and consumption
-cars_clean$"Drivmedelskostnad (kr) för 10000 km" <- NA  # Initialize column
-
-# Bensin (Gasoline)
-bensin_index <- grepl("Bensin", cars_clean$Bränsle, ignore.case = TRUE)
-cars_clean$"Drivmedelskostnad (kr) för 10000 km"[bensin_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[bensin_index] * 100 * pris_bensin, 0)
-
-# Diesel
-diesel_index <- grepl("Diesel", cars_clean$Bränsle, ignore.case = TRUE)
-cars_clean$"Drivmedelskostnad (kr) för 10000 km"[diesel_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[diesel_index] * 100 * pris_diesel, 0)
-
-# Hybrid or environmentally friendly fuel
-hybrid_index <- grepl("Miljöbränsle|Hybrid", cars_clean$Bränsle, ignore.case = TRUE)
-cars_clean$"Drivmedelskostnad (kr) för 10000 km"[hybrid_index] <- round(cars_clean$`Bränsleförbrukning (l / 100 km)`[hybrid_index] * 100 * pris_bensin, 0)
-
-# Electric cars (electricity only)
-elbilar_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
-cars_clean$"Drivmedelskostnad (kr) för 10000 km"[elbilar_index] <- round((cars_clean$`Energiförbrukning (Wh/km)`[elbilar_index] / 1000) * 10000 * pris_el, 0)
-
-# Plug-in hybrids (both electricity and fuel)
-laddhybrid_index <- !is.na(cars_clean$`Energiförbrukning (Wh/km)`) & !is.na(cars_clean$`Bränsleförbrukning (l / 100 km)`)
-
-# Assume 50% of driving is electric and 50% is fuel-based
-el_kostnad <- (cars_clean$`Energiförbrukning (Wh/km)`[laddhybrid_index] / 1000) * 5000 * pris_el
-bränsle_kostnad <- cars_clean$`Bränsleförbrukning (l / 100 km)`[laddhybrid_index] * 50 * pris_bensin
-cars_clean$"Drivmedelskostnad (kr) för 10000 km"[laddhybrid_index] <- round(el_kostnad + bränsle_kostnad, 0)
-
-# To avoid multicollinearity in regression (i.e. one variable being a perfect combination of others),
-# we use k–1 dummy variables for k categories
+```
 
 
+#Distribution inspection
 
+```{r}
+#| label: distribution-check
+#| message: false
+#| warning: false
 
-library(fastDummies)
+# Visualise distributions of all numeric variables -----------------------
+numeric_vars <- cars_clean %>%
+  select(where(is.numeric)) %>%
+  select(where(~ n_distinct(.) > 2)) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value")
 
-# 1. Skapa dummyvariabler för Bränsle (men använd faktorer i modellen)
-cars_clean <- dummy_cols(
-  cars_clean,
-  select_columns = "Bränsle",
-  remove_first_dummy = TRUE,    # referenskategori: El
-  remove_selected_columns = FALSE
-)
-cars_clean$Bränsle <- factor(cars_clean$Bränsle)
-cars_clean$Bränsle <- relevel(cars_clean$Bränsle, ref = "El")
+ggplot(numeric_vars, aes(Value)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  facet_wrap(~ Variable, scales = "free") +
+  theme_minimal() +
+  labs(x = NULL, y = "Count")
 
+```
 
-# 2. Gruppindela Biltyp till färre kategorier
-cars_clean <- cars_clean %>%
-  mutate(
-    Biltyp = case_when(
-      Biltyp %in% c("Halvkombi", "Kombi", "Sedan") ~ "Personbil",
-      Biltyp %in% c("SUV", "Familjebuss", "Yrkesfordon", "Skåpbil") ~ "Storbil",
-      Biltyp %in% c("Coupé", "Cab") ~ "Sportbil",
-      TRUE ~ "Annat"
-    ),
-    Biltyp = factor(Biltyp)
-  )
+```{r}
+#| label: modeling-dataset
+#| message: false
+#| warning: false
 
-# 3. Skapa slutlig modell-dataset där vi använder *bara* faktorer
+# Final modelling dataset -------------------------------------------------
 cars_clean_inf <- cars_clean %>%
   mutate(
     Helförsäkring_log = log(`Helförsäkring (kr / år)`),
-    Pris_log = log(`Pris (kr)`),
-    Skatt_log = log(`Fordonsskatt (kr / år)` + 1),
-    Mätar_log = log(`Mätarställning (km)` + 1),
-    CO2_log = log(`Koldioxidutsläpp blandad (NEDC) g/km` + 1),
-    Bränsleförb_log = log(`Bränsleförbrukning (l / 100 km)` + 1)
+    Hästkrafter_log        = log(Hästkrafter + 1),
+    Pris_log          = log(`Pris (kr)`),
+    Skatt_log         = log(`Fordonsskatt (kr / år)` + 1),
+    Mätar_log         = log(`Mätarställning (km)` + 1),
+    Bränsleförb_log   = log(`Bränsleförbrukning (l / 100 km)` + 1)
   ) %>%
   select(
-    Helförsäkring_log,
-    Hästkrafter,
-    Modellår,
-    Mätar_log,
-    CO2_log,
-    Bränsleförb_log,
-    Bränsle,
-    Biltyp,
-    Pris_log,
-    Skatt_log
+    Helförsäkring_log, Hästkrafter_log, Modellår, Mätar_log,
+    Bränsleförb_log, Bränsle, Pris_log, Skatt_log, `Koldioxidutsläpp blandad (NEDC) g/km`
   )
 
-
 glimpse(cars_clean_inf)
+```
 
-# Correlation with Helförsäkringen as target
-#Pearson-korrelationen fångar endast linjära samband, men vi kan ändå ta bort variablerna som har mycket hög korrelation
+## Correlation inspection
+
+```{r}
+#| label: correlation
+#| message: false
+#| warning: false
+
 cars_clean_inf %>%
-  select_if(is.numeric) %>%
-  summarise(across(everything(), ~ cor(.x, cars_clean_inf[["Helförsäkring_log"]], use = "complete.obs"))) %>%
-  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Correlation") %>%
+  select(where(is.numeric)) %>%
+  summarise(across(everything(), ~ cor(.x, cars_clean_inf$Helförsäkring_log, use = "complete.obs"))) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Correlation") %>%
   arrange(desc(abs(Correlation)))
+```
 
 
+# Statistical Inference
 
+```{r}
+#| label: inference-models-försäkring
+#| message: false
+#| warning: false
 
-
-# We now train model with AIC that means it will only take in those features that are meaningful
-model_f <- lm(`Helförsäkring_log` ~ ., data = cars_clean_inf)
+model_f <- lm(Helförsäkring_log ~ ., data = cars_clean_inf%>%select(-Bränsleförb_log, -Skatt_log, -`Koldioxidutsläpp blandad (NEDC) g/km`))
 summary(model_f)
 confint(model_f)
 
-
+# Diagnostics -------------------------------------------------------------
+par(mfrow = c(2, 2))
 plot(model_f)
-library(car)
+par(mfrow = c(1, 1))
+
 vif(model_f)
 
-____________________________________________________________
-#statistical inference
-#Use the entire dataset (cars_model) for one regression model
-#Report: summary(model), p-values, confidence intervals, and interpretations
+```
 
-Statistical inference
+```{r}
+#| label: inference-models-försäkring
+#| message: false
+#| warning: false
 
-# Försäkringens beroende av hästkrafter, modellår, bränsletyp etc.
-mod_forsakring <- lm(`Helförsäkring (kr / år)` ~ Hästkrafter + Modellår + Bränsle_Diesel + Bränsle_El, data = cars_clean)
+model_p <- lm(Pris_log ~ .,  data = cars_clean_inf %>% select(-Helförsäkring_log, -Skatt_log, -Bränsleförb_log, -`Koldioxidutsläpp blandad (NEDC) g/km`))
 
-# Fordonsskattens beroende av modellår, hästkrafter etc.
-mod_skatt <- lm(`Fordonsskatt (kr / år)` ~ Modellår + Hästkrafter + Bränsle_Diesel + Bränsle_El, data = cars_clean)
+summary(model_p)
+confint(model_p)
 
+# Diagnostics -------------------------------------------------------------
+par(mfrow = c(2, 2))
+plot(model_p)
+par(mfrow = c(1, 1))
 
+vif(model_p)
 
+```
 
+```{r}
+#| label: inference-models-skatt
+#| message: false
+#| warning: false
 
+model_s <- lm(Skatt_log ~ .,  data = cars_clean_inf %>% select(-Helförsäkring_log, -Bränsleförb_log))
 
+summary(model_s)
+confint(model_s)
 
+# Diagnostics -------------------------------------------------------------
+par(mfrow = c(2, 2))
+plot(model_s)
+par(mfrow = c(1, 1))
 
+vif(model_s)
 
-
-
-
-
-
-
-
-
-________________________________________
-# Create the column 'Ägandekostnad (kr) per år' which sums all recurring yearly ownership costs
-
-# Note:
-# - The 20% down payment (the part we paid from our savings) is not included in the yearly cost,
-#   as it is a one-time expense and does not impact ongoing ownership costs.
-# - We also do not account for unpredictable costs such as repairs, accidents, insurance deductibles, or parts replacement.
-
-cars_clean$`Ägandekostnad (kr) per år` <- round(
-  cars_clean$`Fordonsskatt (kr / år)` +                      # vehicle tax
-  cars_clean$`Helförsäkring (kr / år)` +                     # insurance
-  cars_clean$`Lån (kr) per år` +                              # loan interest
-  cars_clean$`Drivmedelskostnad (kr) för 10000 km` +          # fuel or electricity
-  cars_clean$`Värdeminskning (kr) per år` +                   # annual depreciation
-  800 +                                                       # tire wear
-  4000,                                                       # service
-  0                                                           # round to whole kronor
-)
-________________________________________________________________
-
-Here begins EDA
+```
 
 
-#Remove variables that we alredy know (ex. Derived directly from Pris or Koldioxidutsläpp vs Bränsleförbrukning) are highly correlated with the target or redundant with each other
-
-# Select only numeric columns
-numeric_cols <- cars_clean %>%
-  select(where(is.numeric))
-
-# Remove specific columns that are either redundant or derived from each other
-cols_to_remove <- c(
-  "Pris (kr)",
-  "Värdeminskning (kr) per år",
-  "Lån (kr) per år",
-  "Koldioxidutsläpp blandad (NEDC) g/km"
-)
-
-# Filter the cleaned set
-numeric_filtered <- numeric_cols %>%
-  select(-all_of(cols_to_remove))
-
-  
-# Compute and plot the correlation matrix
-cor_matrix_cleaned <- cor(numeric_filtered, use = "complete.obs")
-
-corrplot(
-  cor_matrix_cleaned,
-  method = "color",
-  type = "upper",
-  tl.cex = 0.8,
-  number.cex = 0.7,
-  tl.col = "black",
-  addCoef.col = "black"
-)
 
 
-# Remove columns that are weakly correlated or redundant with stronger predictors
-# The goal is to simplify the model while preserving predictive power
+---
 
-# Remove variables that are weakly correlated or redundant with stronger predictors
-# Goal: simplify the model while preserving interpretability and avoiding multicollinearity
+# Create a new dataset
+```{r}
+#| label: Create a new dataset
+#| message: false
+#| warning: false
 
-cars_model <- cars_clean %>%
+
+# 0) Select variables, log-transform, dummy code, and clean names
+cars_price <- cars_clean %>%
   select(
-    `Ägandekostnad (kr) per år`,     # 🎯 Target variable we're predicting
+    pris                 = `Pris (kr)`,
+    fordonsskatt         = `Fordonsskatt (kr / år)`,
+    helforsakring        = `Helförsäkring (kr / år)`,
+    hastkrafter          = Hästkrafter,
+    matarstallning       = `Mätarställning (km)`,
+    co2                  = `Koldioxidutsläpp blandad (NEDC) g/km`
+  ) %>%
+  mutate(
+    pris_log             = log(pris),
+    fordonsskatt_log     = log(fordonsskatt + 1),
+    helforsakring_log    = log(helforsakring + 1),
+    hastkrafter_log      = log(hastkrafter + 1),
+    matarstallning_log   = log(matarstallning + 1),
+  ) %>%
+  select(
+    pris,
+    ends_with("_log")
+  ) %>%
+  clean_names()
+# Kontrollera strukturen
+glimpse(cars_price)
 
-    # Keep these predictors (they are independent and showed predictive value)
-    Hästkrafter,                     # Strong linear relationship with cost — significant predictor
-    Modellår,                        # Newer cars tend to cost more — significant
-    `Mätarställning (km)`,          # Optional — weak to moderate effect, but useful to test
-    Bränsle_Diesel,                 # Fuel type dummy — significant positive effect on cost
-    Bränsle_El,                     # Fuel type dummy — significantly reduces cost
-    `Bränsle_Miljöbränsle/Hybrid`   # Fuel type dummy — moderately reduces cost
+```
 
-    # Remove the following:
-    # - BiltypPersonbil
-    # - BiltypSportbil
-    # - BiltypStorbil
-    # Reason: All three had high p-values in the linear model (not statistically significant)
-    #         and did not meaningfully contribute to predicting ownership cost.
-    #         Removing them simplifies the model without hurting performance.
+# Predictive Modeling
 
-    # Also already excluded in earlier steps:
-    # - Pris, Värdeminskning, Lån, Försäkring, Skatt, Drivmedelskostnad, Energiförbrukning
-    # Because they were either directly used to compute the target or introduce target leakage
-  )
+```{r}
+#| label: rf-price-prediction
+#| message: false
+#| warning: false
 
-
-
-# visualize how each numeric predictor relates to your target.
-#“Do we have multicollinearity?” Yes
-ggpairs(select(cars_model, where(is.numeric)))
-
-library(tidyr)
 library(dplyr)
+library(fastDummies)
+library(janitor)
+library(rsample)
+library(ranger)
+library(purrr)
+library(yardstick)
+library(tibble)
 
-# 1. Select numeric predictors, excluding the target
-num_predictors <- cars_model %>%
-  select(where(is.numeric)) %>%
-  select(-`Ägandekostnad (kr) per år`)
-
-# 2. Add the target back for plotting
-plot_data <- bind_cols(
-  num_predictors,
-  Ägandekostnad = cars_model$`Ägandekostnad (kr) per år`
+# Define the log-transformed numeric columns
+log_vars <- c(
+  "pris_log", 
+  "fordonsskatt_log", 
+  "helforsakring_log",
+  "hastkrafter_log",
+  "matarstallning_log"
 )
 
-# Convert to long format for ggplot
-plot_data_long <- plot_data %>%
-  pivot_longer(cols = -Ägandekostnad, names_to = "Variable", values_to = "Value")
+# 0) Beräkna outliergränser före split ------------------------
+compute_outlier_bounds <- function(df, columns, lower = 0.01, upper = 0.99) {
+  map(columns, function(col) {
+    q_low  <- quantile(df[[col]], lower, na.rm = TRUE)
+    q_high <- quantile(df[[col]], upper, na.rm = TRUE)
+    tibble(variable = col, q_low = q_low, q_high = q_high)
+  }) %>% bind_rows()
+}
 
-library(ggplot2)
+outlier_bounds <- compute_outlier_bounds(cars_price, log_vars)
 
-ggplot(plot_data_long, aes(x = Value, y = Ägandekostnad)) +
-  geom_point(alpha = 0.3, size = 0.8) +
-  geom_smooth(method = "loess", se = FALSE, color = "steelblue") +
-  facet_wrap(~ Variable, scales = "free_x") +
-  theme_minimal() +
-  labs(
-    title = "Predictors vs Yearly Ownership Cost",
-    x = "Predictor Value",
-    y = "Ownership Cost (kr/year)"
-  )
+# Funktion för att filtrera bort outliers enligt dessa gränser ------------
+apply_outlier_filter <- function(df, bounds) {
+  for (i in seq_len(nrow(bounds))) {
+    col <- bounds$variable[i]
+    df <- df %>% filter(.data[[col]] >= bounds$q_low[i], .data[[col]] <= bounds$q_high[i])
+  }
+  df
+}
 
 
 
-____________________________________________________
-#Building the predictive model
-#Use a train/val/test split
-#Fit the model on train, evaluate on val
-#Report RMSE, R²
-#Mention how well the model generalizes
-
-set.seed(123)  # for reproducibility
-
-# First: split into training+validation and test sets (80/20)
-split_1 <- initial_split(cars_model, prop = 0.8)
-train_val <- training(split_1)
-test <- testing(split_1)
-
-# Further split train+val into train (70%) and validation (30%)
+# 1) Train/test split (80/20), stratified on log(price)
 set.seed(123)
+split <- initial_split(cars_price, prop = 0.8, strata = pris_log)
+train <- training(split)
+test  <- testing(split)
 
-split_2 <- initial_split(train_val, prop = 0.7)
-train <- training(split_2)
-val <- testing(split_2)
+# 1) Split
+set.seed(123)
+split <- initial_split(cars_price, prop = 0.8, strata = pris_log)
+train <- training(split)
+test  <- testing(split)
 
-#one should aim to have at least 10–15 rows per feature in a regression model. We are using <15 features - safe!
+# 2) Rensa outliers i båda
+train <- apply_outlier_filter(train, outlier_bounds)
+test  <- apply_outlier_filter(test,  outlier_bounds)
 
-nrow(train) / ncol(train) # >10 → we're good
 
 
+# 3) Create 5-fold stratified CV on cleaned training set
+set.seed(123)
+folds <- vfold_cv(train, v = 5, strata = pris_log)
 
-# Build a linear model using all remaining predictors
-model_lm <- lm(`Ägandekostnad (kr) per år` ~ ., data = train)
+# 4) Light manual tuning of hyperparameters
+param_grid <- expand.grid(
+  num.trees     = c(50, 200),
+  mtry          = c(floor(ncol(train)/2)),
+  min.node.size = c(1, 10),
+  max.depth     = c(2, 12)
+)
 
-# View model summary
-summary(model_lm)
+cv_results <- map_dfr(1:nrow(param_grid), function(i) {
+  p <- param_grid[i, ]
+  
+  fold_metrics <- map_dfr(folds$splits, function(split) {
+    tr <- analysis(split)
+    va <- assessment(split)
+    
+    mod <- ranger(
+      formula       = pris_log ~ .,
+      data          = tr %>% select(-pris),
+      num.trees     = p$num.trees,
+      mtry          = p$mtry,
+      min.node.size = p$min.node.size,
+      max.depth     = p$max.depth
+    )
+    
+    pred_log <- predict(mod, va)$predictions
+    pred_original <- exp(pred_log)
+    
+    tibble(
+      RMSE_log = rmse_vec(truth = va$pris_log, estimate = pred_log),
+      RMSE_SEK = rmse_vec(truth = va$pris, estimate = pred_original)
+    )
+  })
+  
+  tibble(
+    num.trees     = p$num.trees,
+    mtry          = p$mtry,
+    min.node.size = p$min.node.size,
+    max.depth     = p$max.depth,
+    RMSE_log      = mean(fold_metrics$RMSE_log),
+    RMSE_SEK      = mean(fold_metrics$RMSE_SEK)
+  )
+})
+
+# 5) Choose best hyperparameter set
+best_params <- cv_results %>%
+  arrange(RMSE_log) %>%
+  dplyr::slice(1)
+
+
+# 6) Train final model on full training set with best parameters
+final_model <- ranger(
+  formula       = pris_log ~ .,
+  data          = train %>% select(-pris),
+  num.trees     = best_params$num.trees,
+  mtry          = best_params$mtry,
+  min.node.size = best_params$min.node.size,
+  max.depth     = best_params$max.depth,
+  importance    = "impurity"
+)
+
+
+# 7) Predict on test set and back-transform
+pred_log_test <- predict(final_model, data = test)$predictions
+pred_original_test <- exp(pred_log_test)
+
+# 8) Compute RMSE on test set (log and original scale)
+rmse_log_test <- rmse_vec(truth = test$pris_log, estimate = pred_log_test)
+rmse_original_test <- rmse_vec(truth = test$pris, estimate = pred_original_test)
+
+# 9) Output final results
+cat("\nBest Hyperparameters:\n")
+print(best_params)
+
+cat("\nTest Set Results:\n")
+print(tibble(
+  Dataset   = "Test Set (Final)",
+  RMSE_log  = round(rmse_log_test, 4),
+  RMSE_SEK  = round(rmse_original_test, 2)
+))
+
+
+library(vip)  # Variable Importance Plots
+
+vip(final_model, num_features = 10, bar = TRUE) +
+  ggtitle("Variable Importance (Predictors)")
+
+```
+
+
 
