@@ -21,7 +21,7 @@ By combining predictive modeling (e.g., random forest) with inference-driven app
 #| label: setup
 #| message: false
 #| warning: false
-#| results: hide      # <‑ add this if you want zero printed output
+#| results: hide
 
 packages <- c(
   "tidyverse", "readxl", "fastDummies", "corrplot",
@@ -187,43 +187,6 @@ vif(model_s)
 
 
 
-
----
-
-# Create a new dataset
-```{r}
-#| label: Create a new dataset
-#| message: false
-#| warning: false
-
-
-# 0) Select variables, log-transform, dummy code, and clean names
-cars_price <- cars_clean %>%
-  select(
-    pris                 = `Pris (kr)`,
-    fordonsskatt         = `Fordonsskatt (kr / år)`,
-    helforsakring        = `Helförsäkring (kr / år)`,
-    hastkrafter          = Hästkrafter,
-    matarstallning       = `Mätarställning (km)`,
-    co2                  = `Koldioxidutsläpp blandad (NEDC) g/km`
-  ) %>%
-  mutate(
-    pris_log             = log(pris),
-    fordonsskatt_log     = log(fordonsskatt + 1),
-    helforsakring_log    = log(helforsakring + 1),
-    hastkrafter_log      = log(hastkrafter + 1),
-    matarstallning_log   = log(matarstallning + 1),
-  ) %>%
-  select(
-    pris,
-    ends_with("_log")
-  ) %>%
-  clean_names()
-# Kontrollera strukturen
-glimpse(cars_price)
-
-```
-
 # Predictive Modeling
 
 ```{r}
@@ -239,8 +202,17 @@ library(ranger)
 library(purrr)
 library(yardstick)
 library(tibble)
+library(vip)
 
-# Define the log-transformed numeric columns
+# -----------------------------------------------------------
+# Step 1: Data Preparation (log-transformations & dummy vars)
+# -----------------------------------------------------------
+
+
+library(dplyr)
+library(janitor)
+
+# Define log-transform target columns
 log_vars <- c(
   "pris_log", 
   "fordonsskatt_log", 
@@ -249,18 +221,36 @@ log_vars <- c(
   "matarstallning_log"
 )
 
-# 0) Beräkna outliergränser före split ------------------------
+# Clean and transform the dataset
+cars_price <- cars_clean %>% 
+  mutate(id = row_number()) %>%
+  transmute(
+    id,
+    fordonsbenamning = Fordonsbenämning,
+    handelsbeteckning = Handelsbeteckning,
+    pris = `Pris (kr)`,
+    pris_log = log(pris),
+    fordonsskatt_log = log(`Fordonsskatt (kr / år)` + 1),
+    helforsakring_log = log(`Helförsäkring (kr / år)` + 1),
+    hastkrafter_log = log(Hästkrafter + 1),
+    matarstallning_log = log(`Mätarställning (km)` + 1),
+    #co2 = `Koldioxidutsläpp blandad (NEDC) g/km`
+  ) %>%
+  clean_names()
+
+# -----------------------------------------------------------
+# Step 2: Compute outlier thresholds before splitting
+# -----------------------------------------------------------
 compute_outlier_bounds <- function(df, columns, lower = 0.01, upper = 0.99) {
   map(columns, function(col) {
-    q_low  <- quantile(df[[col]], lower, na.rm = TRUE)
-    q_high <- quantile(df[[col]], upper, na.rm = TRUE)
-    tibble(variable = col, q_low = q_low, q_high = q_high)
+    tibble(
+      variable = col,
+      q_low = quantile(df[[col]], lower, na.rm = TRUE),
+      q_high = quantile(df[[col]], upper, na.rm = TRUE)
+    )
   }) %>% bind_rows()
 }
 
-outlier_bounds <- compute_outlier_bounds(cars_price, log_vars)
-
-# Funktion för att filtrera bort outliers enligt dessa gränser ------------
 apply_outlier_filter <- function(df, bounds) {
   for (i in seq_len(nrow(bounds))) {
     col <- bounds$variable[i]
@@ -269,61 +259,49 @@ apply_outlier_filter <- function(df, bounds) {
   df
 }
 
+outlier_bounds <- compute_outlier_bounds(cars_price, log_vars)
 
-
-# 1) Train/test split (80/20), stratified on log(price)
+# -----------------------------------------------------------
+# Step 3: Initial Split (80/20) stratified by log(price)
+# -----------------------------------------------------------
 set.seed(123)
 split <- initial_split(cars_price, prop = 0.8, strata = pris_log)
 train <- training(split)
 test  <- testing(split)
 
-# 1) Split
-set.seed(123)
-split <- initial_split(cars_price, prop = 0.8, strata = pris_log)
-train <- training(split)
-test  <- testing(split)
-
-# 2) Rensa outliers i båda
+# Apply outlier removal
 train <- apply_outlier_filter(train, outlier_bounds)
-test  <- apply_outlier_filter(test,  outlier_bounds)
+test  <- apply_outlier_filter(test, outlier_bounds)
 
-
-
-# 3) Create 5-fold stratified CV on cleaned training set
+# -----------------------------------------------------------
+# Step 4: Hyperparameter Grid Search via 5-fold Cross-validation
+# -----------------------------------------------------------
 set.seed(123)
 folds <- vfold_cv(train, v = 5, strata = pris_log)
 
-# 4) Light manual tuning of hyperparameters
 param_grid <- expand.grid(
   num.trees     = c(50, 200),
-  mtry          = c(floor(ncol(train)/2)),
+  mtry          = floor(ncol(train)/2),
   min.node.size = c(1, 10),
   max.depth     = c(2, 12)
 )
 
-cv_results <- map_dfr(1:nrow(param_grid), function(i) {
+cv_results <- purrr::map_dfr(seq_len(nrow(param_grid)), function(i) {
   p <- param_grid[i, ]
-  
-  fold_metrics <- map_dfr(folds$splits, function(split) {
-    tr <- analysis(split)
-    va <- assessment(split)
+  fold_metrics <- map_dbl(folds$splits, function(spl) {
+    tr <- analysis(spl)
+    va <- assessment(spl)
     
     mod <- ranger(
-      formula       = pris_log ~ .,
-      data          = tr %>% select(-pris),
+      pris_log ~ .,
+      data          = tr %>% select(-id, -fordonsbenamning, -handelsbeteckning, -pris),
       num.trees     = p$num.trees,
       mtry          = p$mtry,
       min.node.size = p$min.node.size,
       max.depth     = p$max.depth
     )
-    
-    pred_log <- predict(mod, va)$predictions
-    pred_original <- exp(pred_log)
-    
-    tibble(
-      RMSE_log = rmse_vec(truth = va$pris_log, estimate = pred_log),
-      RMSE_SEK = rmse_vec(truth = va$pris, estimate = pred_original)
-    )
+    pred <- predict(mod, va)$predictions
+    rmse_vec(truth = va$pris_log, estimate = pred)
   })
   
   tibble(
@@ -331,21 +309,22 @@ cv_results <- map_dfr(1:nrow(param_grid), function(i) {
     mtry          = p$mtry,
     min.node.size = p$min.node.size,
     max.depth     = p$max.depth,
-    RMSE_log      = mean(fold_metrics$RMSE_log),
-    RMSE_SEK      = mean(fold_metrics$RMSE_SEK)
+    RMSE_log_CV   = mean(fold_metrics)
   )
 })
 
-# 5) Choose best hyperparameter set
-best_params <- cv_results %>%
-  arrange(RMSE_log) %>%
-  dplyr::slice(1)
+# Select best hyperparameters based on CV
+best_params <- cv_results %>% 
+  slice_min(RMSE_log_CV, n = 1)
 
 
-# 6) Train final model on full training set with best parameters
+
+# -----------------------------------------------------------
+# Step 5: Train final model on entire training set
+# -----------------------------------------------------------
 final_model <- ranger(
-  formula       = pris_log ~ .,
-  data          = train %>% select(-pris),
+  pris_log ~ .,
+  data          = train %>% select(-id, -fordonsbenamning, -handelsbeteckning, -pris),
   num.trees     = best_params$num.trees,
   mtry          = best_params$mtry,
   min.node.size = best_params$min.node.size,
@@ -354,30 +333,59 @@ final_model <- ranger(
 )
 
 
-# 7) Predict on test set and back-transform
-pred_log_test <- predict(final_model, data = test)$predictions
-pred_original_test <- exp(pred_log_test)
+# -----------------------------------------------------------
+# Step 7: Evaluate RMSE (final hold-out test set)
+# -----------------------------------------------------------
+# Predictions on test set (hold-out)
+test_pred_log <- predict(final_model, test)$predictions
+test_pred_sek <- exp(test_pred_log)
 
-# 8) Compute RMSE on test set (log and original scale)
-rmse_log_test <- rmse_vec(truth = test$pris_log, estimate = pred_log_test)
-rmse_original_test <- rmse_vec(truth = test$pris, estimate = pred_original_test)
+# Calculate RMSE for test set
+rmse_test_log <- rmse_vec(test$pris_log, test_pred_log)
+rmse_test_sek <- rmse_vec(test$pris, test_pred_sek)
 
-# 9) Output final results
-cat("\nBest Hyperparameters:\n")
-print(best_params)
+# Compute SEK equivalent of the CV RMSE_log (0.228)
+# Using mean predicted price (SEK) from test set as scaling factor
+mean_test_pred_sek <- mean(test_pred_sek)
+rmse_cv_sek_equiv <- mean_test_pred_sek * best_params$RMSE_log_CV
 
-cat("\nTest Set Results:\n")
-print(tibble(
-  Dataset   = "Test Set (Final)",
-  RMSE_log  = round(rmse_log_test, 4),
-  RMSE_SEK  = round(rmse_original_test, 2)
-))
+# Step 8: Results (CV vs. Test)
+results_summary <- tibble(
+  Dataset  = c("5-fold CV (grid-search)", "Test set (hold-out)"),
+  RMSE_log = round(c(best_params$RMSE_log_CV, rmse_test_log), 4),
+  RMSE_SEK = round(c(rmse_cv_sek_equiv, rmse_test_sek), 0)
+)
+
+print(results_summary)
 
 
-library(vip)  # Variable Importance Plots
 
-vip(final_model, num_features = 10, bar = TRUE) +
-  ggtitle("Variable Importance (Predictors)")
+# -----------------------------------------------------------
+# Step 9: Residual Analysis – overpriced vs. underpriced cars
+# -----------------------------------------------------------
+test_results <- test %>% 
+  mutate(
+    pred_log = test_pred_log,
+    pred_sek = test_pred_sek,
+    diff_sek = pris - pred_sek,
+    diff_pct = 100 * diff_sek / pred_sek
+  ) %>% 
+  select(id, fordonsbenamning, handelsbeteckning, pris, pred_sek, diff_sek, diff_pct)
+
+overpriced  <- test_results %>% arrange(desc(diff_sek)) %>% slice_head(n = 5)
+underpriced <- test_results %>% arrange(diff_sek) %>% slice_head(n = 5)
+
+cat("\nTop 5 Overpriced Cars:\n")
+print(overpriced)
+
+cat("\nTop 5 Underpriced Cars:\n")
+print(underpriced)
+
+# -----------------------------------------------------------
+# Step 10: Variable importance visualization
+# -----------------------------------------------------------
+vip(final_model, num_features = 10, bar = TRUE)
+
 
 ```
 

@@ -1,0 +1,55 @@
+---
+title: "Blocket Car Analysis"
+author:
+  - Geisol
+  - Maria
+format: html
+---
+
+# Introduction
+
+In this project, we analyze web-scraped used car listings from Blocket, enriched with technical specifications from Transportstyrelsen and cost estimates for insurance and taxation in Sweden. The primary goal has shifted from estimating total yearly ownership cost to two main objectives:
+(1) Predicting market prices for used cars in Sweden, with a focus on non-premium, mid-range vehicles, and
+(2) Gaining statistical insight into what factors influence insurance premiums and vehicle taxes, using linear regression models.
+
+By combining predictive modeling (e.g., random forest) with inference-driven approaches (e.g., linear regression), we aim to both improve price prediction accuracy and interpret underlying patterns in insurance and tax structures in the Swedish car market.
+
+
+---
+
+
+```{r}
+#| label: setup
+#| message: false
+#| warning: false
+#| results: hide
+
+packages <- c(
+  "tidyverse", "readxl", "fastDummies", "corrplot",
+  "rsample", "GGally", "ggcorrplot", "car", "xgboost", "yardstick", "tibble", "ranger", "glmnet", "vip", "httr", "jsonlite", "pxweb"
+)
+
+idx <- packages %in% rownames(installed.packages())
+if (any(!idx)) install.packages(packages[!idx])
+
+suppressPackageStartupMessages(
+  invisible(lapply(packages, library, character.only = TRUE))
+)
+```
+
+```{r}
+
+library(remotes)
+remotes::install_github("rOpenGov/pxweb", force = TRUE, build_vignettes = FALSE)
+library(pxweb)
+
+Sys.setlocale(locale = "UTF-8")
+
+# Get data from SCB (Statistics Sweden)
+d <- pxweb_interactive("api.scb.se")
+
+# Start with a specific path.
+d <- pxweb_interactive("https://api.scb.se/OV0104/v1/doris/en/ssd/BE/BE0101/BE0101A")
+```
+
+
