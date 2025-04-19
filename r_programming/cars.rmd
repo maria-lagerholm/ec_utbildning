@@ -130,7 +130,8 @@ cars_clean_inf %>%
 # Statistical Inference
 
 ```{r}
-#| label: inference-models-försäkring
+#| label: inference-models-pris
+
 #| message: false
 #| warning: false
 
@@ -208,9 +209,6 @@ library(vip)
 # Step 1: Data Preparation (log-transformations & dummy vars)
 # -----------------------------------------------------------
 
-
-library(dplyr)
-library(janitor)
 
 # Define log-transform target columns
 log_vars <- c(
