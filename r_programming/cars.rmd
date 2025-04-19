@@ -1,10 +1,13 @@
 ---
 title: "Blocket Car Analysis"
 author:
-  - Geisol
-  - Maria
-format: html
+  - Geisol Urbina and Maria Lagerholm
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
+
 
 # Introduction
 

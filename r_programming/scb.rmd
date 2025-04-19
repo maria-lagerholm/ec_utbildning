@@ -1,18 +1,25 @@
 ---
 title: "Blocket Car Analysis"
-author:
-  - Geisol
-  - Maria
-format: html
+author: 
+  - Geisol Yissel Urbina and Maria Lagerholm
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
 ---
+
 
 # Introduction
 
-In this project, we analyze web-scraped used car listings from Blocket, enriched with technical specifications from Transportstyrelsen and cost estimates for insurance and taxation in Sweden. The primary goal has shifted from estimating total yearly ownership cost to two main objectives:
-(1) Predicting market prices for used cars in Sweden, with a focus on non-premium, mid-range vehicles, and
-(2) Gaining statistical insight into what factors influence insurance premiums and vehicle taxes, using linear regression models.
+In this project, we explore the Swedish used car market using data scraped from Blocket and enriched with technical attributes from Transportstyrelsen and external statistics from SCB. The analysis has two core objectives:
 
-By combining predictive modeling (e.g., random forest) with inference-driven approaches (e.g., linear regression), we aim to both improve price prediction accuracy and interpret underlying patterns in insurance and tax structures in the Swedish car market.
+To predict market prices for mid-range used cars in Sweden using machine learning (e.g., Random Forest).
+
+To understand what variables actually influence insurance premiums and vehicle tax levels via statistical inference (e.g., linear regression).
+
+We combine predictive and explanatory modeling to better understand price-setting mechanisms and cost structures for private car ownership. The figure below, generated from SCB data, illustrates trends in new car registrations, which reflect macro-level market shifts that may indirectly affect the availability and pricing of used cars.
+
+
 
 
 ---
